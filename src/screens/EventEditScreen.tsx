@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { newEventId, useWatchStore, withEvents } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
@@ -23,6 +24,7 @@ const todayIso = () => {
 
 export function EventEditScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
+  const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const existing = watch?.events.find((e) => e.id === route.params.eventId);
 
@@ -71,7 +73,12 @@ export function EventEditScreen({ navigation, route }: Props) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing(2) }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag">
+
       <Text style={styles.label}>Title (shown on the watch)</Text>
       <TextInput
         style={styles.input}

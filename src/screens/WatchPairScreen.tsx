@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
@@ -16,6 +17,7 @@ interface Found {
 
 export function WatchPairScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
+  const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const [found, setFound] = useState<Found[]>([]);
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'error'>('idle');
@@ -92,7 +94,7 @@ export function WatchPairScreen({ navigation, route }: Props) {
       <FlatList
         data={found}
         keyExtractor={(f) => f.id}
-        contentContainerStyle={{ padding: spacing(2) }}
+        contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}
         renderItem={({ item }) => (
           <Pressable style={styles.deviceCard} onPress={() => pair(item.id)}>
             <Text style={styles.deviceName}>{item.name}</Text>

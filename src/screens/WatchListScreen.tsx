@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { newWatch, useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 import { Watch } from '../model/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchList'>;
@@ -21,6 +23,10 @@ function syncStatus(watch: Watch): { label: string; color: string } {
 export function WatchListScreen({ navigation }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const [name, setName] = useState('');
+  const insets = useSafeAreaInsets();
+  // Keep the input bar above the keyboard when open, and above the nav bar
+  // (gesture pill or 3-button) when closed. See useKeyboardHeight.
+  const bottomLift = Math.max(insets.bottom, useKeyboardHeight());
 
   const addWatch = () => {
     const trimmed = name.trim();
@@ -39,6 +45,7 @@ export function WatchListScreen({ navigation }: Props) {
       <FlatList
         data={watches}
         keyExtractor={(w) => w.id}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: spacing(2) }}
         ListEmptyComponent={
           <Text style={styles.empty}>
@@ -66,7 +73,7 @@ export function WatchListScreen({ navigation }: Props) {
           );
         }}
       />
-      <View style={styles.addRow}>
+      <View style={[styles.addRow, { marginBottom: bottomLift }]}>
         <TextInput
           style={styles.input}
           placeholder="New watch name"
@@ -74,6 +81,7 @@ export function WatchListScreen({ navigation }: Props) {
           value={name}
           onChangeText={setName}
           onSubmitEditing={addWatch}
+          returnKeyType="done"
           testID="new-watch-name"
         />
         <Pressable style={styles.addButton} onPress={addWatch} testID="add-watch">

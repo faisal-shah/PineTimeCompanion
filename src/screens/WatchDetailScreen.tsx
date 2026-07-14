@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore, withEvents } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 import { describeRule } from '../model/types';
 import { makeTransport } from '../ble/transportFactory';
 import { WatchResetError } from '../ble/syncManager';
@@ -17,6 +19,8 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeText, setComposeText] = useState('');
+  const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
 
   if (!watch) {
     return null;
@@ -129,7 +133,9 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <Modal visible={composeOpen} transparent animationType="fade" onRequestClose={() => setComposeOpen(false)}>
-        <View style={styles.modalBackdrop}>
+        {/* paddingBottom shrinks the centering area to the space above the
+            keyboard so the auto-focused card stays fully visible. */}
+        <View style={[styles.modalBackdrop, { paddingBottom: keyboardHeight }]}>
           <View style={styles.composeCard}>
             <Text style={styles.composeTitle}>Message to {watch.name}</Text>
             <TextInput
@@ -191,7 +197,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         )}
       />
 
-      <View style={styles.bottomRow}>
+      <View style={[styles.bottomRow, { paddingBottom: spacing(2) + insets.bottom }]}>
         <Pressable
           style={[styles.bigButton, { backgroundColor: colors.card }]}
           onPress={() => navigation.navigate('EventEdit', { watchId: watch.id })}
