@@ -185,6 +185,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         <ToolbarButton label="Set time" onPress={doSetTime} disabled={busy !== null} />
         <ToolbarButton label="Battery" onPress={doBattery} disabled={busy !== null} />
         <ToolbarButton label="Message" onPress={doMessage} disabled={busy !== null} />
+        <ToolbarButton label="Prayer" onPress={() => navigation.navigate('PrayerSettings', { watchId: watch.id })} />
       </View>
 
       <FlatList

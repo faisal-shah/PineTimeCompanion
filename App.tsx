@@ -7,6 +7,7 @@ import { WatchListScreen } from './src/screens/WatchListScreen';
 import { WatchDetailScreen } from './src/screens/WatchDetailScreen';
 import { EventEditScreen } from './src/screens/EventEditScreen';
 import { WatchPairScreen } from './src/screens/WatchPairScreen';
+import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { loadWatches, saveWatches, WatchStore, WatchStoreContext } from './src/storage/store';
 import { Watch } from './src/model/types';
 import { colors } from './src/ui/theme';
@@ -71,6 +72,7 @@ export default function App() {
           <Stack.Screen name="WatchDetail" component={WatchDetailScreen} options={{ title: 'Watch' }} />
           <Stack.Screen name="EventEdit" component={EventEditScreen} options={{ title: 'Event' }} />
           <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
+          <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </WatchStoreContext.Provider>

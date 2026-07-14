@@ -3,4 +3,5 @@ export type RootStackParamList = {
   WatchDetail: { watchId: string };
   EventEdit: { watchId: string; eventId?: number };
   WatchPair: { watchId: string };
+  PrayerSettings: { watchId: string };
 };
