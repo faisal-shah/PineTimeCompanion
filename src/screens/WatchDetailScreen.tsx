@@ -6,6 +6,7 @@ import { useWatchStore, withEvents } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { describeRule } from '../model/types';
 import { makeTransport } from '../ble/transportFactory';
+import { WatchResetError } from '../ble/syncManager';
 import { readBattery, sendMessageToWatch, setWatchTime, syncWatch } from '../ble/syncManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
@@ -34,15 +35,47 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     }
   };
 
+  const applySync = (result: Awaited<ReturnType<typeof syncWatch>>) => {
+    upsertWatch({
+      ...watch,
+      events: result.events,
+      scheduleVersion: result.base.version,
+      syncedVersion: result.base.version,
+      syncBase: result.base,
+      lastSyncAt: new Date().toISOString(),
+    });
+    if (result.notices.length > 0) {
+      Alert.alert(
+        'Merged changes from another device',
+        result.notices.map((n) => `• ${n.title}: ${n.detail}`).join('\n')
+      );
+    } else {
+      Alert.alert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.events.length} events on the watch.`);
+    }
+  };
+
   const doSync = () =>
     withTransport('Sync', async (deviceId) => {
-      const result = await syncWatch(makeTransport(deviceId), watch);
-      upsertWatch({
-        ...watch,
-        syncedVersion: result.digest.scheduleVersion,
-        lastSyncAt: new Date().toISOString(),
-      });
-      Alert.alert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.digest.count} events on the watch.`);
+      try {
+        applySync(await syncWatch(makeTransport(deviceId), watch));
+      } catch (e) {
+        if (e instanceof WatchResetError) {
+          Alert.alert(
+            'Watch looks new or reset',
+            'Its schedule is empty but this phone has synced with it before. Restore this phone\u2019s schedule to the watch?',
+            [
+              { text: 'Start fresh (keep watch empty)', style: 'destructive',
+                onPress: () => void syncWatch(makeTransport(deviceId), { ...watch, events: [] }, true)
+                  .then(applySync).catch((err) => Alert.alert('Sync failed', (err as Error).message)) },
+              { text: 'Restore from this phone',
+                onPress: () => void syncWatch(makeTransport(deviceId), watch, true)
+                  .then(applySync).catch((err) => Alert.alert('Sync failed', (err as Error).message)) },
+            ]
+          );
+          return;
+        }
+        throw e;
+      }
     });
 
   const doSetTime = () =>
@@ -74,7 +107,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     ]);
   };
 
-  const needsSync = watch.syncedVersion !== watch.scheduleVersion;
+  const needsSync = watch.syncBase === undefined || watch.scheduleVersion !== watch.syncBase.version;
 
   return (
     <View style={styles.container}>

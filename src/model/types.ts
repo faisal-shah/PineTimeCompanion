@@ -15,7 +15,8 @@ export interface EventRule {
 }
 
 export interface WatchEvent {
-  id: number; // stable per watch, assigned by the app
+  /** random 16-bit id, unique per watch across ALL companions (not sequential) */
+  id: number;
   title: string; // shown on the watch; truncated to 23 UTF-8 bytes on sync
   hour: number; // 0-23, watch-local
   minute: number; // 0-59
@@ -23,6 +24,17 @@ export interface WatchEvent {
   anchorDate: string;
   rule: EventRule;
   enabled: boolean;
+  /** UNIX seconds (UTC) of the last edit on any companion; drives merge conflicts */
+  lastModified: number;
+}
+
+/** What this device last successfully synced — the "base" of the three-way merge. */
+export interface SyncBase {
+  /** schedule version we committed */
+  version: number;
+  /** UNIX seconds when the sync happened */
+  syncedAt: number;
+  events: WatchEvent[];
 }
 
 export interface Watch {
@@ -35,6 +47,8 @@ export interface Watch {
   /** version last confirmed on the watch (undefined = never synced) */
   syncedVersion?: number;
   lastSyncAt?: string; // ISO timestamp
+  /** last successful sync snapshot; absent until the first sync */
+  syncBase?: SyncBase;
   batteryPercent?: number;
   events: WatchEvent[];
 }

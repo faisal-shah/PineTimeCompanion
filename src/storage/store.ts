@@ -28,8 +28,14 @@ export function newWatch(name: string): Watch {
   };
 }
 
-export function nextEventId(watch: Watch): number {
-  return watch.events.reduce((max, e) => Math.max(max, e.id), 0) + 1;
+/** Random 16-bit ids so events created on different phones never collide. */
+export function newEventId(watch: Watch): number {
+  for (;;) {
+    const id = 1 + Math.floor(Math.random() * 0xfffe);
+    if (!watch.events.some((e) => e.id === id)) {
+      return id;
+    }
+  }
 }
 
 /** Any schedule edit bumps the version so the watch digest goes stale. */

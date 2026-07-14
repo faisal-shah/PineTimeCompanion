@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
-import { nextEventId, useWatchStore, withEvents } from '../storage/store';
+import { newEventId, useWatchStore, withEvents } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { RuleKind, WEEKDAY_LABELS, WatchEvent } from '../model/types';
 import { upcoming } from '../model/recurrence';
@@ -38,12 +38,13 @@ export function EventEditScreen({ navigation, route }: Props) {
 
   const draft: WatchEvent = useMemo(
     () => ({
-      id: existing?.id ?? (watch ? nextEventId(watch) : 1),
+      id: existing?.id ?? (watch ? newEventId(watch) : 1),
       title: title.trim() || 'Untitled',
       hour,
       minute,
       anchorDate,
       enabled,
+      lastModified: 0, // stamped at save time
       rule:
         kind === 'once'
           ? { kind }
@@ -64,7 +65,8 @@ export function EventEditScreen({ navigation, route }: Props) {
 
   const save = () => {
     const others = watch.events.filter((e) => e.id !== draft.id);
-    upsertWatch(withEvents(watch, [...others, draft]));
+    const stamped = { ...draft, lastModified: Math.floor(Date.now() / 1000) };
+    upsertWatch(withEvents(watch, [...others, stamped]));
     navigation.goBack();
   };
 

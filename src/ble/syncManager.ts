@@ -1,25 +1,81 @@
 // Transport-agnostic sync + companion functions. All logic lives here, above
 // the WatchTransport seam, so the whole flow is emulator-testable.
 
-import { Watch } from '../model/types';
+import { SyncBase, Watch, WatchEvent } from '../model/types';
+import { MergeNotice, looksLikeWatchReset, mergeSchedules } from '../model/merge';
 import {
   decodeDigest,
+  decodeEventRecord,
   encodeAbortSync,
   encodeBeginSync,
   encodeCommitSync,
   encodeEventMessage,
-  Digest,
 } from './scheduleProtocol';
 import { BRIDGE_CHAR, TransportError, WatchTransport } from './transport';
 
-const MIN_MTU = 48; // EventRecord message (38 B) + ATT overhead
+const MIN_MTU = 48; // EventRecord message (42 B) + ATT overhead
 
-export interface SyncResult {
-  skipped: boolean; // digest already matched
-  digest: Digest;
+export class WatchResetError extends TransportError {
+  constructor() {
+    super('the watch schedule is empty but this device has synced before');
+    this.name = 'WatchResetError';
+  }
 }
 
-export async function syncWatch(transport: WatchTransport, watch: Watch): Promise<SyncResult> {
+export interface SyncResult {
+  /** true when neither side needed anything */
+  skipped: boolean;
+  /** the merged event list (what is now on the watch AND should be local state) */
+  events: WatchEvent[];
+  /** the new base snapshot to store */
+  base: SyncBase;
+  /** what changed on this device, for the UI */
+  notices: MergeNotice[];
+}
+
+const randomVersion = () => 1 + Math.floor(Math.random() * 0xfffffffe);
+
+async function pullEvents(transport: WatchTransport, count: number): Promise<WatchEvent[]> {
+  const out: WatchEvent[] = [];
+  for (let i = 0; i < count; i++) {
+    await transport.write(BRIDGE_CHAR.eventRead, new Uint8Array([i]));
+    out.push(decodeEventRecord(await transport.read(BRIDGE_CHAR.eventRead)));
+  }
+  return out;
+}
+
+async function pushEvents(transport: WatchTransport, events: WatchEvent[], version: number): Promise<void> {
+  try {
+    await transport.write(BRIDGE_CHAR.scheduleSync, encodeBeginSync(events.length, version));
+    for (const [index, event] of events.entries()) {
+      await transport.write(BRIDGE_CHAR.scheduleSync, encodeEventMessage(index, event));
+    }
+    await transport.write(BRIDGE_CHAR.scheduleSync, encodeCommitSync(events.length));
+  } catch (e) {
+    await transport.write(BRIDGE_CHAR.scheduleSync, encodeAbortSync()).catch(() => undefined);
+    throw e;
+  }
+  // Commit is applied on the watch's system task; poll the digest briefly.
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await new Promise((r) => setTimeout(r, 150));
+    const digest = decodeDigest(await transport.read(BRIDGE_CHAR.scheduleDigest));
+    if (digest.scheduleVersion === version && digest.count === events.length) {
+      return;
+    }
+  }
+  throw new TransportError('watch did not confirm the sync');
+}
+
+/**
+ * Multi-companion sync: pull the watch's schedule, three-way merge with this
+ * device's list against the last-synced base, push the merged set. The BLE
+ * connection is exclusive, so the whole cycle is atomic.
+ *
+ * `acceptWatchReset`: an empty watch (version 0) when this device has synced
+ * before usually means the watch was wiped. Pass false to get WatchResetError
+ * (ask the user), true to restore this device's schedule to the watch.
+ */
+export async function syncWatch(transport: WatchTransport, watch: Watch, acceptWatchReset = false): Promise<SyncResult> {
   if (!watch.deviceId) {
     throw new TransportError('watch is not paired');
   }
@@ -30,38 +86,46 @@ export async function syncWatch(transport: WatchTransport, watch: Watch): Promis
       throw new TransportError(`negotiated MTU ${mtu} is too small to sync (need >= ${MIN_MTU})`);
     }
 
-    let digest = decodeDigest(await transport.read(BRIDGE_CHAR.scheduleDigest));
-    if (digest.scheduleVersion === watch.scheduleVersion && digest.count === watch.events.length) {
-      return { skipped: true, digest };
-    }
-    const enabledFits = watch.events.length <= digest.capacity;
-    if (!enabledFits) {
-      throw new TransportError(`schedule has ${watch.events.length} events but the watch holds at most ${digest.capacity}`);
-    }
+    const digest = decodeDigest(await transport.read(BRIDGE_CHAR.scheduleDigest));
+    const base = watch.syncBase;
+    const nobodyElseWrote = base !== undefined && digest.scheduleVersion === base.version;
 
-    try {
-      await transport.write(BRIDGE_CHAR.scheduleSync, encodeBeginSync(watch.events.length, watch.scheduleVersion));
-      for (const [index, event] of watch.events.entries()) {
-        await transport.write(BRIDGE_CHAR.scheduleSync, encodeEventMessage(index, event));
-      }
-      await transport.write(BRIDGE_CHAR.scheduleSync, encodeCommitSync(watch.events.length));
-    } catch (e) {
-      await transport.write(BRIDGE_CHAR.scheduleSync, encodeAbortSync()).catch(() => undefined);
-      throw e;
-    }
-
-    // Commit is applied on the watch's system task; poll the digest briefly.
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await new Promise((r) => setTimeout(r, 150));
-      digest = decodeDigest(await transport.read(BRIDGE_CHAR.scheduleDigest));
-      if (digest.scheduleVersion === watch.scheduleVersion && digest.count === watch.events.length) {
-        return { skipped: false, digest };
+    let theirs: WatchEvent[];
+    if (nobodyElseWrote) {
+      theirs = base.events; // watch still holds exactly what we last pushed
+    } else {
+      theirs = await pullEvents(transport, digest.count);
+      if (!acceptWatchReset && looksLikeWatchReset(theirs, digest.scheduleVersion, base)) {
+        throw new WatchResetError();
       }
     }
-    throw new TransportError(
-      `watch did not confirm the sync (wanted v${watch.scheduleVersion}/${watch.events.length}, ` +
-        `got v${digest.scheduleVersion}/${digest.count})`
-    );
+
+    const result = mergeSchedules(watch.events, theirs, acceptWatchReset ? undefined : base);
+
+    if (result.merged.length > digest.capacity) {
+      throw new TransportError(
+        `merged schedule has ${result.merged.length} events but the watch holds at most ${digest.capacity}; ` +
+          'delete some events and sync again'
+      );
+    }
+
+    if (!result.needsPush && nobodyElseWrote && !result.changedLocally) {
+      return {
+        skipped: true,
+        events: result.merged,
+        base,
+        notices: [],
+      };
+    }
+
+    const version = randomVersion();
+    await pushEvents(transport, result.merged, version);
+    return {
+      skipped: false,
+      events: result.merged,
+      base: { version, syncedAt: Math.floor(Date.now() / 1000), events: result.merged },
+      notices: result.notices,
+    };
   } finally {
     await transport.disconnect().catch(() => undefined);
   }
