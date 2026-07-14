@@ -24,12 +24,22 @@
     },
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      [
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false
         }
       ],
-      "./plugins/withAbiSplits.js"
+      "./plugins/withAbiSplits.js",
+      "expo-build-properties"
     ]
   }
 }
