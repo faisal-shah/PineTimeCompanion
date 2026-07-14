@@ -28,7 +28,8 @@
         {
           "isBackgroundEnabled": false
         }
-      ]
+      ],
+      "./plugins/withAbiSplits.js"
     ]
   }
 }
