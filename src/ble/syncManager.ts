@@ -2,6 +2,7 @@
 // the WatchTransport seam, so the whole flow is emulator-testable.
 
 import { SyncBase, Watch, WatchEvent } from '../model/types';
+import { decodePrayerSettings, encodePrayerSettings, WireSettings } from './prayerProtocol';
 import { MergeNotice, looksLikeWatchReset, mergeSchedules } from '../model/merge';
 import {
   decodeDigest,
@@ -189,6 +190,39 @@ export async function readBattery(transport: WatchTransport, deviceId: string): 
       throw new TransportError('empty battery read');
     }
     return payload[0];
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/**
+ * Write prayer settings and verify by read-back. The watch commits the write
+ * asynchronously on its SystemTask, so the read-back retries briefly before
+ * concluding the write was lost.
+ */
+export async function writePrayerSettings(transport: WatchTransport, deviceId: string, settings: WireSettings): Promise<void> {
+  const blob = encodePrayerSettings(settings);
+  await transport.connect(deviceId);
+  try {
+    await transport.write(BRIDGE_CHAR.prayerSettings, blob);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise((r) => setTimeout(r, 200));
+      const echoed = await transport.read(BRIDGE_CHAR.prayerSettings);
+      if (echoed.length === blob.length && echoed.every((b, i) => b === blob[i])) {
+        return;
+      }
+    }
+    throw new TransportError('watch did not confirm the prayer settings');
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/** Read the watch's current prayer settings (covers on-watch edits). */
+export async function readPrayerSettings(transport: WatchTransport, deviceId: string): Promise<WireSettings> {
+  await transport.connect(deviceId);
+  try {
+    return decodePrayerSettings(await transport.read(BRIDGE_CHAR.prayerSettings));
   } finally {
     await transport.disconnect().catch(() => undefined);
   }

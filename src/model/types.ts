@@ -4,6 +4,29 @@
 
 export type RuleKind = 'once' | 'everyNDays' | 'weekly' | 'monthly';
 
+export type PrayerMethod = 'mwl' | 'isna' | 'egyptian' | 'ummAlQura' | 'karachi';
+export type AsrMadhab = 'standard' | 'hanafi';
+
+/**
+ * Per-watch prayer configuration, mirrored byte-for-byte on the watch
+ * (InfiniTime doc/PrayerService.md). Coordinates and offset are kept in the
+ * integer wire units (degrees x100, quarter-hours) so app<->watch round trips
+ * stay exact.
+ */
+export interface PrayerSettings {
+  method: PrayerMethod;
+  asrMadhab: AsrMadhab;
+  alertsEnabled: boolean;
+  /** latitude in degrees x100, north positive (-9000..9000) */
+  latE2: number;
+  /** longitude in degrees x100, east positive (-18000..18000) */
+  lonE2: number;
+  /** local clock offset from UTC in quarter hours (-48..+56) */
+  utcOffsetQuarters: number;
+  /** UNIX seconds of the last edit in this app; drives new-watch prefill */
+  editedAt: number;
+}
+
 export interface EventRule {
   kind: RuleKind;
   /** everyNDays: interval >= 1 (1 = daily) */
@@ -52,6 +75,8 @@ export interface Watch {
   batteryPercent?: number;
   /** event slots on the watch, from its Digest; unknown until the first sync */
   capacity?: number;
+  /** prayer configuration; absent until first configured */
+  prayerSettings?: PrayerSettings;
   events: WatchEvent[];
 }
 

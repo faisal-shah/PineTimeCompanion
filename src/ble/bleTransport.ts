@@ -7,6 +7,7 @@ import { BleManager, Device } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import { BridgeCharId, BRIDGE_CHAR, TransportError, WatchTransport } from './transport';
 import { SCHEDULE_SERVICE_UUID, SYNC_COMMAND_CHAR_UUID, DIGEST_CHAR_UUID, EVENT_READ_CHAR_UUID } from './scheduleProtocol';
+import { PRAYER_SERVICE_UUID, PRAYER_SETTINGS_CHAR_UUID } from './prayerProtocol';
 
 // Standard GATT services the companion basics use.
 const CTS_SERVICE = '00001805-0000-1000-8000-00805f9b34fb';
@@ -23,6 +24,7 @@ const CHAR_MAP: Record<BridgeCharId, { service: string; characteristic: string; 
   [BRIDGE_CHAR.newAlert]: { service: ANS_SERVICE, characteristic: ANS_NEW_ALERT, withResponse: true },
   [BRIDGE_CHAR.battery]: { service: BATTERY_SERVICE, characteristic: BATTERY_LEVEL, withResponse: true },
   [BRIDGE_CHAR.eventRead]: { service: SCHEDULE_SERVICE_UUID, characteristic: EVENT_READ_CHAR_UUID, withResponse: true },
+  [BRIDGE_CHAR.prayerSettings]: { service: PRAYER_SERVICE_UUID, characteristic: PRAYER_SETTINGS_CHAR_UUID, withResponse: true },
 };
 
 export class BleTransport implements WatchTransport {

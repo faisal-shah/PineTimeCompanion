@@ -10,6 +10,7 @@ export const BRIDGE_CHAR = {
   newAlert: 3,
   battery: 4,
   eventRead: 5,
+  prayerSettings: 6,
 } as const;
 
 export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];
