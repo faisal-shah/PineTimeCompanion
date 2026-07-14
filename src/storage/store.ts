@@ -1,0 +1,52 @@
+// App state: a list of watches, persisted as one JSON blob in AsyncStorage.
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useContext } from 'react';
+import { Watch, WatchEvent } from '../model/types';
+
+const STORAGE_KEY = 'pinetime-companion/watches/v1';
+
+export async function loadWatches(): Promise<Watch[]> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Watch[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveWatches(watches: Watch[]): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(watches));
+}
+
+export function newWatch(name: string): Watch {
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    scheduleVersion: 1,
+    events: [],
+  };
+}
+
+export function nextEventId(watch: Watch): number {
+  return watch.events.reduce((max, e) => Math.max(max, e.id), 0) + 1;
+}
+
+/** Any schedule edit bumps the version so the watch digest goes stale. */
+export function withEvents(watch: Watch, events: WatchEvent[]): Watch {
+  return { ...watch, events, scheduleVersion: watch.scheduleVersion + 1 };
+}
+
+export interface WatchStore {
+  watches: Watch[];
+  upsertWatch(watch: Watch): void;
+  removeWatch(id: string): void;
+}
+
+export const WatchStoreContext = createContext<WatchStore>({
+  watches: [],
+  upsertWatch: () => undefined,
+  removeWatch: () => undefined,
+});
+
+export const useWatchStore = () => useContext(WatchStoreContext);
