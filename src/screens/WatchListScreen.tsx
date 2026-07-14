@@ -67,7 +67,9 @@ export function WatchListScreen({ navigation }: Props) {
                 {item.batteryPercent !== undefined && (
                   <Text style={styles.battery}>{item.batteryPercent}%</Text>
                 )}
-                <Text style={styles.eventCount}>{item.events.length} events</Text>
+                <Text style={styles.eventCount}>
+                  {item.events.length}/{item.capacity ?? 64} events
+                </Text>
               </View>
             </Pressable>
           );

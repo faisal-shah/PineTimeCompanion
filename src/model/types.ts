@@ -50,6 +50,8 @@ export interface Watch {
   /** last successful sync snapshot; absent until the first sync */
   syncBase?: SyncBase;
   batteryPercent?: number;
+  /** event slots on the watch, from its Digest; unknown until the first sync */
+  capacity?: number;
   events: WatchEvent[];
 }
 

@@ -31,6 +31,8 @@ export interface SyncResult {
   base: SyncBase;
   /** what changed on this device, for the UI */
   notices: MergeNotice[];
+  /** event slots on the watch, from its Digest */
+  capacity: number;
 }
 
 const randomVersion = () => 1 + Math.floor(Math.random() * 0xfffffffe);
@@ -115,6 +117,7 @@ export async function syncWatch(transport: WatchTransport, watch: Watch, acceptW
         events: result.merged,
         base,
         notices: [],
+        capacity: digest.capacity,
       };
     }
 
@@ -125,6 +128,7 @@ export async function syncWatch(transport: WatchTransport, watch: Watch, acceptW
       events: result.merged,
       base: { version, syncedAt: Math.floor(Date.now() / 1000), events: result.merged },
       notices: result.notices,
+      capacity: digest.capacity,
     };
   } finally {
     await transport.disconnect().catch(() => undefined);

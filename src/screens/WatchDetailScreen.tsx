@@ -48,6 +48,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       scheduleVersion: result.base.version,
       syncedVersion: result.base.version,
       syncBase: result.base,
+      capacity: result.capacity,
       lastSyncAt: new Date().toISOString(),
     });
     if (result.notices.length > 0) {
@@ -129,6 +130,17 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   };
 
   const needsSync = watch.syncBase === undefined || watch.scheduleVersion !== watch.syncBase.version;
+  // 64 is the firmware's MaxEvents; the Digest overrides it after the first sync.
+  const capacity = watch.capacity ?? 64;
+  const atCapacity = watch.events.length >= capacity;
+
+  const addEvent = () => {
+    if (atCapacity) {
+      Alert.alert('Watch is full', `All ${capacity} event slots are used. Delete an event first (long-press one).`);
+      return;
+    }
+    navigation.navigate('EventEdit', { watchId: watch.id });
+  };
 
   return (
     <View style={styles.container}>
@@ -197,10 +209,13 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         )}
       />
 
+      <Text style={styles.slots} testID="slots-used">
+        {watch.events.length} of {capacity} slots used
+      </Text>
       <View style={[styles.bottomRow, { paddingBottom: spacing(2) + insets.bottom }]}>
         <Pressable
-          style={[styles.bigButton, { backgroundColor: colors.card }]}
-          onPress={() => navigation.navigate('EventEdit', { watchId: watch.id })}
+          style={[styles.bigButton, { backgroundColor: colors.card }, atCapacity && { opacity: 0.5 }]}
+          onPress={addEvent}
           testID="add-event">
           <Text style={styles.bigButtonText}>+ Event</Text>
         </Pressable>
@@ -247,6 +262,7 @@ const styles = StyleSheet.create({
   eventTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
   disabled: { textDecorationLine: 'line-through', color: colors.textDim },
   eventRule: { color: colors.textDim, fontSize: 13, marginTop: 2 },
+  slots: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: spacing(0.5) },
   bottomRow: { flexDirection: 'row', gap: spacing(1.5), padding: spacing(2) },
   bigButton: { flex: 1, borderRadius: 12, height: 52, alignItems: 'center', justifyContent: 'center' },
   bigButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },

@@ -85,6 +85,11 @@ test('Digest golden vector round-trip', () => {
   assert.deepEqual(digest, { protocolVersion: 1, capacity: 16, count: 3, scheduleVersion: 7 });
 });
 
+test('Digest from a 64-slot watch (doc/ScheduleService.md example)', () => {
+  const digest = decodeDigest(Uint8Array.from(Buffer.from('01400307000000', 'hex')));
+  assert.deepEqual(digest, { protocolVersion: 1, capacity: 64, count: 3, scheduleVersion: 7 });
+});
+
 test('title truncation respects UTF-8 boundaries', () => {
   // 8 x 3-byte CJK chars = 24 bytes > 23: must cut at 21 (7 chars), not 23.
   const title = '中中中中中中中中';
