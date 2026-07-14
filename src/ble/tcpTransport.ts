@@ -6,7 +6,10 @@ import TcpSocket from 'react-native-tcp-socket';
 import { Buffer } from 'buffer';
 import { BridgeCharId, TransportError, WatchTransport } from './transport';
 
-type Pending = { resolve: (r: { status: number; payload: Uint8Array }) => void; reject: (e: Error) => void };
+type Pending = { resolve: (r: { status: number; payload: Uint8Array }) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
+
+const REQUEST_TIMEOUT_MS = 5000;
+const CONNECT_TIMEOUT_MS = 5000;
 
 export class TcpTransport implements WatchTransport {
   private socket?: ReturnType<typeof TcpSocket.createConnection>;
@@ -17,7 +20,11 @@ export class TcpTransport implements WatchTransport {
     const [host, portStr] = deviceId.split(':');
     const port = Number(portStr ?? 18632);
     await new Promise<void>((resolve, reject) => {
-      const socket = TcpSocket.createConnection({ host, port }, () => resolve());
+      const timer = setTimeout(() => reject(new TransportError(`timed out reaching sim bridge at ${host}:${port}`)), CONNECT_TIMEOUT_MS);
+      const socket = TcpSocket.createConnection({ host, port }, () => {
+        clearTimeout(timer);
+        resolve();
+      });
       socket.on('error', (e: Error) => {
         this.failAll(new TransportError(`bridge connection error: ${e.message}`, e));
         reject(new TransportError(`cannot reach sim bridge at ${host}:${port}`, e));
@@ -44,12 +51,15 @@ export class TcpTransport implements WatchTransport {
       const status = this.buffer[0];
       const payload = this.buffer.slice(3, 3 + len);
       this.buffer = this.buffer.slice(3 + len);
-      this.pending.shift()!.resolve({ status, payload });
+      const pending = this.pending.shift()!;
+      clearTimeout(pending.timer);
+      pending.resolve({ status, payload });
     }
   }
 
   private failAll(error: Error) {
     for (const p of this.pending.splice(0)) {
+      clearTimeout(p.timer);
       p.reject(error);
     }
   }
@@ -65,7 +75,16 @@ export class TcpTransport implements WatchTransport {
     frame[3] = data.length >> 8;
     frame.set(data, 4);
     this.socket.write(Buffer.from(frame) as unknown as Uint8Array & string);
-    return new Promise((resolve, reject) => this.pending.push({ resolve, reject }));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const i = this.pending.findIndex((p) => p.timer === timer);
+        if (i >= 0) {
+          this.pending.splice(i, 1);
+        }
+        reject(new TransportError('bridge request timed out'));
+      }, REQUEST_TIMEOUT_MS);
+      this.pending.push({ resolve, reject, timer });
+    });
   }
 
   async requestMtu(_mtu: number): Promise<number> {
