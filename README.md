@@ -13,7 +13,7 @@ Stack: Expo + React Native + TypeScript (same toolchain as tajweed-bytes).
 The whole app runs against InfiniSim through its TCP GATT bridge:
 
 ```sh
-# 1. watch simulator (from pinetime-dev/) — bridge listens on 18632
+# 1. watch simulator (from pinetime-dev-tools/) — bridge listens on 18632
 ./simctl.py start
 
 # 2. this app on the Android emulator (tb_emu)
@@ -35,7 +35,7 @@ npm test        # protocol golden vectors (doc/ScheduleService.md) via node --te
 npx tsc --noEmit
 ```
 
-`pinetime-dev/bridge-test.mjs` is the cross-stack protocol regression against a live
+`pinetime-dev-tools/bridge-test.mjs` is the cross-stack protocol regression against a live
 simulator.
 
 ## Real watches
