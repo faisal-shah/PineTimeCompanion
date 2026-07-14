@@ -3,8 +3,10 @@
 Android companion app for PineTime watches running [our InfiniTime fork](../InfiniTime)
 (branch `scheduler`). Create named watches, build each one a schedule of recurring
 events (once / every-N-days / weekly / monthly), and sync over the InfiniTime
-Schedule Service. Also: set the watch clock, read battery, send a message that pops
-up as a notification on the watch.
+Schedule Service. Also: configure per-watch Islamic prayer times (calculation
+method, Asr madhab, location via phone GPS or manual entry, UTC offset, alerts)
+that the watch then computes locally and vibrates for; set the watch clock, read
+battery, send a message that pops up as a notification on the watch.
 
 Stack: Expo + React Native + TypeScript (same toolchain as tajweed-bytes).
 
