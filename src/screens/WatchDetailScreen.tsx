@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore, withEvents } from '../storage/store';
@@ -15,6 +15,8 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const [busy, setBusy] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeText, setComposeText] = useState('');
 
   if (!watch) {
     return null;
@@ -90,11 +92,26 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       upsertWatch({ ...watch, batteryPercent: percent });
     });
 
-  const doMessage = () =>
-    withTransport('Message', async (deviceId) => {
-      await sendMessageToWatch(makeTransport(deviceId), deviceId, 'PineTimeCompanion', `Hi ${watch.name}!`);
-      Alert.alert('Sent', 'Message is on the watch.');
+  const doMessage = () => {
+    if (!watch.deviceId) {
+      Alert.alert('Not paired', 'Pair this watch first (Pair button above).');
+      return;
+    }
+    setComposeText('');
+    setComposeOpen(true);
+  };
+
+  const sendComposed = () => {
+    const text = composeText.trim();
+    if (!text) {
+      return;
+    }
+    setComposeOpen(false);
+    void withTransport('Message', async (deviceId) => {
+      await sendMessageToWatch(makeTransport(deviceId), deviceId, 'Message', text);
+      Alert.alert('Sent', `On its way to ${watch.name}'s watch.`);
     });
+  };
 
   const deleteEvent = (eventId: number) => {
     Alert.alert('Delete event?', 'It will be removed from the watch at the next sync.', [
@@ -111,6 +128,37 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
+      <Modal visible={composeOpen} transparent animationType="fade" onRequestClose={() => setComposeOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.composeCard}>
+            <Text style={styles.composeTitle}>Message to {watch.name}</Text>
+            <TextInput
+              style={styles.composeInput}
+              value={composeText}
+              onChangeText={setComposeText}
+              placeholder="e.g. Come down for dinner"
+              placeholderTextColor={colors.textDim}
+              multiline
+              maxLength={90}
+              autoFocus
+              testID="compose-text"
+            />
+            <Text style={styles.composeCount}>{composeText.trim().length}/90</Text>
+            <View style={styles.composeButtons}>
+              <Pressable style={styles.composeCancel} onPress={() => setComposeOpen(false)}>
+                <Text style={styles.composeCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.composeSend, !composeText.trim() && { opacity: 0.4 }]}
+                onPress={sendComposed}
+                disabled={!composeText.trim()}
+                testID="compose-send">
+                <Text style={styles.composeSendText}>Send</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <View style={styles.toolbar}>
         <ToolbarButton
           label={watch.deviceId ? 'Re-pair' : 'Pair'}
@@ -196,4 +244,22 @@ const styles = StyleSheet.create({
   bottomRow: { flexDirection: 'row', gap: spacing(1.5), padding: spacing(2) },
   bigButton: { flex: 1, borderRadius: 12, height: 52, alignItems: 'center', justifyContent: 'center' },
   bigButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalBackdrop: { flex: 1, backgroundColor: '#000a', alignItems: 'center', justifyContent: 'center', padding: spacing(3) },
+  composeCard: { backgroundColor: colors.card, borderRadius: 16, padding: spacing(2.5), width: '100%' },
+  composeTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: spacing(1.5) },
+  composeInput: {
+    backgroundColor: colors.background,
+    color: colors.text,
+    borderRadius: 10,
+    padding: spacing(1.5),
+    minHeight: 80,
+    textAlignVertical: 'top',
+    fontSize: 16,
+  },
+  composeCount: { color: colors.textDim, fontSize: 12, textAlign: 'right', marginTop: 4 },
+  composeButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(1.5) },
+  composeCancel: { paddingVertical: spacing(1), paddingHorizontal: spacing(1.5) },
+  composeCancelText: { color: colors.textDim, fontSize: 15 },
+  composeSend: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing(1), paddingHorizontal: spacing(3) },
+  composeSendText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
