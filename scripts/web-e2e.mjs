@@ -30,8 +30,11 @@ const children = [];
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pinetime-web-e2e-'));
 
 function cleanup() {
-  for (const c of children) c.kill();
-  fs.rmSync(profileDir, { recursive: true, force: true });
+  for (const c of children) {
+    try { c.kill(); } catch {}
+  }
+  // Chrome may still be flushing its profile as it dies — best effort only.
+  try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch {}
 }
 process.on('exit', cleanup);
 

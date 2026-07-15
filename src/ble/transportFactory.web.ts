@@ -7,7 +7,8 @@
 // keeps them out of the web bundle.
 
 import { WsTransport } from './wsTransport';
-import { TransportError, WatchTransport } from './transport';
+import { WebBluetoothTransport } from './webBluetoothTransport';
+import { WatchTransport } from './transport';
 
 // The ws-tcp proxy (scripts/ws-tcp-proxy.mjs) listens here and forwards to the
 // sim bridge on 18632.
@@ -22,6 +23,5 @@ export function makeTransport(deviceId: string): WatchTransport {
   if (isSimulatorDeviceId(deviceId)) {
     return new WsTransport();
   }
-  // Real watches over Web Bluetooth arrive with webBluetoothTransport.ts.
-  throw new TransportError('Real-watch Bluetooth on web is not wired up yet — pair the simulator.');
+  return new WebBluetoothTransport();
 }

@@ -1,71 +1,43 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { SIMULATOR_DEVICE_ID } from '../ble/transportFactory';
+import { FoundWatch, ScanHandle, scanForWatches } from '../ble/pairScan';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchPair'>;
-
-interface Found {
-  id: string;
-  name: string;
-  rssi: number | null;
-}
 
 export function WatchPairScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
-  const [found, setFound] = useState<Found[]>([]);
-  const [scanState, setScanState] = useState<'idle' | 'scanning' | 'error'>('idle');
+  const [found, setFound] = useState<FoundWatch[]>([]);
+  const [scanState, setScanState] = useState<'idle' | 'scanning'>('idle');
   const [error, setError] = useState('');
 
-  const managerRef = useRef<import('react-native-ble-plx').BleManager | null>(null);
+  const scanRef = useRef<ScanHandle | null>(null);
 
-  const stopScan = () => {
-    managerRef.current?.stopDeviceScan();
-  };
-
-  useEffect(() => stopScan, []);
+  useEffect(() => () => scanRef.current?.stop(), []);
 
   const scan = async () => {
     setError('');
     setFound([]);
+    setScanState('scanning');
     try {
-      if (Platform.OS === 'android') {
-        const results = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        ]);
-        if (Object.values(results).some((r) => r !== PermissionsAndroid.RESULTS.GRANTED)) {
-          throw new Error('Bluetooth permissions denied');
-        }
-      }
-      const { BleManager } = await import('react-native-ble-plx');
-      managerRef.current ??= new BleManager();
-      setScanState('scanning');
-      managerRef.current.startDeviceScan(null, { allowDuplicates: false }, (scanError, device) => {
-        if (scanError) {
-          setScanState('error');
-          setError(scanError.message);
-          stopScan();
-          return;
-        }
-        if (device?.name && /InfiniTime|Pinetime/i.test(device.name)) {
-          setFound((prev) =>
-            prev.some((f) => f.id === device.id) ? prev : [...prev, { id: device.id, name: device.name!, rssi: device.rssi }]
-          );
-        }
-      });
-      setTimeout(() => {
-        stopScan();
-        setScanState('idle');
-      }, 12000);
+      scanRef.current = await scanForWatches(
+        (f) => setFound((prev) => (prev.some((p) => p.id === f.id) ? prev : [...prev, f])),
+        (scanError) => {
+          setScanState('idle');
+          if (scanError) {
+            setError(scanError.message);
+          }
+        },
+      );
     } catch (e) {
-      setScanState('error');
+      setScanState('idle');
       setError((e as Error).message);
     }
   };
@@ -74,7 +46,7 @@ export function WatchPairScreen({ navigation, route }: Props) {
     if (!watch) {
       return;
     }
-    stopScan();
+    scanRef.current?.stop();
     upsertWatch({ ...watch, deviceId });
     navigation.goBack();
   };
@@ -86,11 +58,11 @@ export function WatchPairScreen({ navigation, route }: Props) {
         <Text style={styles.simButtonSub}>InfiniSim GATT bridge at {SIMULATOR_DEVICE_ID} (dev)</Text>
       </Pressable>
 
-      {Platform.OS !== 'web' && (
-        <Pressable style={styles.scanButton} onPress={scan} disabled={scanState === 'scanning'}>
-          <Text style={styles.scanButtonText}>{scanState === 'scanning' ? 'Scanning…' : 'Scan for real watches'}</Text>
-        </Pressable>
-      )}
+      <Pressable style={styles.scanButton} onPress={scan} disabled={scanState === 'scanning'} testID="pair-scan">
+        <Text style={styles.scanButtonText}>
+          {scanState === 'scanning' ? 'Scanning…' : Platform.OS === 'web' ? 'Choose a real watch (Bluetooth)' : 'Scan for real watches'}
+        </Text>
+      </Pressable>
       {!!error && <Text style={styles.error}>{error}</Text>}
 
       <FlatList
