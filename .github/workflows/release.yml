@@ -1,0 +1,108 @@
+# Builds every distributable when a GitHub release is published and attaches
+# the artifacts to it: per-ABI Android APKs, Windows installer + portable exe,
+# Linux AppImage, macOS dmg, and the static web bundle. Deliberately NOT run
+# on push/PR — releases only. Re-run for an existing release with the manual
+# dispatch (workflow_dispatch) by passing its tag.
+#
+# No signing secrets anywhere: APKs use the RN template debug keystore that
+# expo prebuild regenerates (same key everywhere, so CI builds upgrade-install
+# over local ones); desktop builds are unsigned (macOS: right-click -> Open
+# past Gatekeeper, or xattr -dr com.apple.quarantine).
+
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to (re)build assets for, e.g. v0.7.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install dependencies
+        run: npm ci
+      - name: Type-check and unit tests
+        run: |
+          npx tsc --noEmit
+          npm test
+      - name: Generate android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release APKs
+        run: cd android && ./gradlew assembleRelease
+      - name: Attach APKs to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for apk in android/app/build/outputs/apk/release/*.apk; do
+            abi=$(basename "$apk" | sed 's/^app-//; s/-release\.apk$//')
+            cp "$apk" "PineTimeCompanion-${TAG#v}-android-${abi}.apk"
+          done
+          gh release upload "$TAG" PineTimeCompanion-*-android-*.apk --clobber
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Never attempt code signing on the runners.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+      - name: Export web bundle
+        shell: bash
+        run: npx expo export --platform web --output-dir desktop/dist
+      - name: Build desktop app
+        shell: bash
+        run: |
+          cd desktop
+          npm ci
+          npx electron-builder --publish never --config.extraMetadata.version="${TAG#v}"
+      - name: Attach desktop artifacts to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          gh release upload "$TAG" desktop/release/*.AppImage desktop/release/*.exe desktop/release/*.dmg --clobber
+      - name: Attach web bundle to the release
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd desktop/dist && zip -qr "../../PineTimeCompanion-${TAG#v}-web.zip" .
+          cd ../.. && gh release upload "$TAG" "PineTimeCompanion-${TAG#v}-web.zip" --clobber
