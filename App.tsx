@@ -9,6 +9,7 @@ import { EventEditScreen } from './src/screens/EventEditScreen';
 import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
+import { AppleLoginScreen } from './src/screens/AppleLoginScreen';
 import { loadWatches, saveWatches, WatchStore, WatchStoreContext } from './src/storage/store';
 import { migrateSecrets } from './src/secure/secrets';
 import { Watch } from './src/model/types';
@@ -84,6 +85,7 @@ export default function App() {
           <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
+          <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </WatchStoreContext.Provider>

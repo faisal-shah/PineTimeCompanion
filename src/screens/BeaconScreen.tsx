@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,14 +10,22 @@ import { advertisementKeyBytes, generateFindMyKey, keyFileContents, keyFileName 
 import { enableBeacon, writeBeaconKey } from '../ble/syncManager';
 import { makeTransport } from '../ble/transportFactory';
 import { getBeaconPrivateKey, saveBeaconPrivateKey } from '../secure/secrets';
+import { AppleSession, loadSession, signOut } from '../findmy/apple/session';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Beacon'>;
 
-export function BeaconScreen({ route }: Props) {
+export function BeaconScreen({ route, navigation }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const [busy, setBusy] = useState<string | null>(null);
+  const [session, setSession] = useState<AppleSession | null>(null);
+
+  useEffect(() => {
+    const refresh = () => loadSession().then(setSession);
+    refresh();
+    return navigation.addListener('focus', refresh);
+  }, [navigation]);
 
   if (!watch) {
     return null;
@@ -160,6 +168,27 @@ export function BeaconScreen({ route }: Props) {
       <Text style={styles.hint}>
         The exported file (macless-haystack format) holds the private key — keep it safe. Load it into your macless-haystack
         instance to see this watch's location.
+      </Text>
+
+      <Text style={styles.label}>5. Locate this watch</Text>
+      {session ? (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.status}>Signed in to Apple as</Text>
+            <Text style={styles.mono}>{session.info.accountName || session.username}</Text>
+          </View>
+          <Pressable style={styles.secondaryButton} onPress={() => signOut().then(() => setSession(null))}>
+            <Text style={styles.secondaryText}>Sign out of Apple</Text>
+          </Pressable>
+        </>
+      ) : (
+        <Pressable style={styles.button} onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin">
+          <Text style={styles.buttonText}>Sign in to Apple</Text>
+        </Pressable>
+      )}
+      <Text style={styles.hint}>
+        Sign in with a burner Apple ID to pull this watch's crowd-sourced location from Apple's Find My network and show it
+        on a map. Location retrieval is added next.
       </Text>
     </ScrollView>
   );

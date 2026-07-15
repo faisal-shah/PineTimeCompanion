@@ -5,4 +5,5 @@ export type RootStackParamList = {
   WatchPair: { watchId: string };
   PrayerSettings: { watchId: string };
   Beacon: { watchId: string };
+  AppleLogin: undefined;
 };
