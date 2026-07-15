@@ -186,6 +186,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         <ToolbarButton label="Battery" onPress={doBattery} disabled={busy !== null} />
         <ToolbarButton label="Message" onPress={doMessage} disabled={busy !== null} />
         <ToolbarButton label="Prayer" onPress={() => navigation.navigate('PrayerSettings', { watchId: watch.id })} />
+        <ToolbarButton label="Find My" onPress={() => navigation.navigate('Beacon', { watchId: watch.id })} />
       </View>
 
       <FlatList
@@ -242,7 +243,7 @@ function ToolbarButton({ label, onPress, disabled }: { label: string; onPress: (
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  toolbar: { flexDirection: 'row', gap: spacing(1), padding: spacing(2), paddingBottom: 0 },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1), padding: spacing(2), paddingBottom: 0 },
   toolbarButton: {
     backgroundColor: colors.card,
     borderRadius: 8,
