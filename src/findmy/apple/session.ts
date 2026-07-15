@@ -13,7 +13,7 @@
 // surfaces as "sign in again" — password only, no SMS — thanks to device trust.
 
 import { getAppleSession, saveAppleSession, clearAppleSession } from '../../secure/secrets';
-import { DeviceIdentity, getAnisette, getDeviceIdentity } from './anisette';
+import { AnisetteData, DeviceIdentity, getAnisette, getDeviceIdentity } from './anisette';
 import { AccountInfo, authenticate } from './gsa';
 import { loginMobileMe } from './mobileme';
 import { PhoneNumber, TwoFactorContext, list2faPhoneNumbers, requestSmsCode, submitSmsCode } from './twofa';
@@ -56,8 +56,12 @@ async function finishLogin(
   password: string,
   identity: DeviceIdentity,
   overrides?: string[],
+  reuseAnisette?: AnisetteData,
 ): Promise<AppleSession> {
-  const anisette = await getAnisette(overrides);
+  // After 2FA, Apple's device trust is tied to the anisette machine id used
+  // during the challenge (which public servers rotate per fetch). Reuse the same
+  // anisette for the re-auth + iCloud login, or Apple prompts 2FA all over again.
+  const anisette = reuseAnisette ?? (await getAnisette(overrides));
   const res = await authenticate(username, password, anisette, identity);
   if (res.kind !== 'authenticated') {
     throw new Error('Unexpected 2FA prompt after the code was accepted; please try signing in again.');
@@ -134,5 +138,6 @@ export async function submit2fa(pending: PendingLogin, phoneId: number, code: st
   // yields a different machine id and Apple rejects the code with HTTP 401.
   await submitSmsCode(pending._ctx, phoneId, code);
   // The session is now trusted server-side; a fresh SRP run yields the tokens.
-  return finishLogin(pending._username, pending._password, pending._identity, pending._overrides);
+  // Reuse the SAME anisette so the machine id stays the one Apple just trusted.
+  return finishLogin(pending._username, pending._password, pending._identity, pending._overrides, pending._ctx.anisette);
 }
