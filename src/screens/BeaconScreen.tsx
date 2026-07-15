@@ -191,7 +191,7 @@ export function BeaconScreen({ route, navigation }: Props) {
         </Pressable>
       )}
       <Text style={styles.hint}>
-        Sign in with a burner Apple ID to pull this watch's crowd-sourced location from Apple's Find My network and show it
+        Sign in with a burner Apple Account to pull this watch's crowd-sourced location from Apple's Find My network and show it
         on a map.
       </Text>
     </ScrollView>

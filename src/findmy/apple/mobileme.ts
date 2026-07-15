@@ -45,7 +45,13 @@ export async function loginMobileMe(
   const status = mm.status ?? data.status;
   if (status !== 0) {
     const message = mm['status-message'] ?? data['status-message'] ?? 'unknown error';
-    throw new Error(`iCloud login failed (status ${status}): ${message}`);
+    // status 1 / "Account limit reached" almost always means the Apple Account is
+    // not yet activated for iCloud — the fix is a one-time device sign-in.
+    const hint =
+      status === 1 || /limit reached/i.test(String(message))
+        ? " — this Apple Account isn't activated for iCloud yet. Sign into iCloud + Find My once on any iPhone/iPad/Mac (which activates it to 5 GB), then try again."
+        : '';
+    throw new Error(`iCloud login failed (status ${status}): ${message}${hint}`);
   }
   const token = mm['service-data']?.tokens?.searchPartyToken;
   if (!data.dsid || !token) {

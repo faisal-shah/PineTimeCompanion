@@ -23,11 +23,13 @@ macless-haystack server needed:
 2. **Provision to watch** — writes the 28-byte advertisement key over BLE.
 3. **Turn on Find My** — the watch drops the connection, goes non-connectable, and
    broadcasts. (Off is only reachable on the watch — Settings → Find My.)
-4. **Sign in to Apple** — with a **burner Apple ID that uses SMS 2FA** (see the
-   warning in-app). Login runs entirely in TypeScript against public anisette-v3
-   servers (no native anisette): SRP-6a GrandSlam + SMS 2FA + the search-party
-   token. The session persists in the keystore and the device identity is stable,
-   so you sign in (and do 2FA) rarely.
+4. **Sign in to Apple** — with a **burner Apple Account that uses SMS 2FA** (see the
+   warning in-app). It must also have been signed into iCloud + Find My on a real
+   Apple device once; a brand-new account is not activated and Apple rejects the
+   iCloud login with "Account limit reached". Login runs entirely in TypeScript
+   against public anisette-v3 servers (no native anisette): SRP-6a GrandSlam + SMS
+   2FA + the search-party token. The session persists in the keystore and the
+   device identity is stable, so you sign in (and do 2FA) rarely.
 5. **View location on map** — fetches Apple's encrypted reports for the watch's key,
    decrypts them on-device (P-224 ECDH + AES-GCM), and draws the last-known point,
    a history trail, and an accuracy circle on OpenStreetMap tiles (MapLibre +

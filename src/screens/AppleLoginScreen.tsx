@@ -76,11 +76,12 @@ export function AppleLoginScreen({ navigation }: Props) {
       contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}
       keyboardShouldPersistTaps="handled">
       <View style={styles.warning}>
-        <Text style={styles.warningTitle}>Use a burner Apple ID</Text>
+        <Text style={styles.warningTitle}>Use a burner Apple Account</Text>
         <Text style={styles.warningBody}>
           Signing in goes through a shared public anisette server, which carries a real risk of Apple locking the
-          account. Use a throwaway Apple ID you don't care about. The account must use SMS two-factor authentication —
-          app-based / push 2FA is not supported by this flow.
+          account. Use a throwaway Apple Account you don't care about. It must use SMS two-factor authentication
+          (app-based / push 2FA is not supported), and it must have been signed into iCloud + Find My on a real Apple
+          device once — a brand-new account is not activated and Apple will reject it.
         </Text>
       </View>
 
@@ -88,7 +89,7 @@ export function AppleLoginScreen({ navigation }: Props) {
 
       {(phase === 'form' || phase === 'busy') && !pending && (
         <>
-          <Text style={styles.label}>Apple ID</Text>
+          <Text style={styles.label}>Apple Account</Text>
           <TextInput
             style={styles.input}
             value={email}

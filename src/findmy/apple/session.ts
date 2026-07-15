@@ -106,7 +106,7 @@ export async function login(username: string, password: string, overrides?: stri
 
   if (res.trustedDevice) {
     throw new Error(
-      'This account is set up for trusted-device (push) 2FA, which is not supported. Use a burner Apple ID with SMS-based 2FA.',
+      'This account is set up for trusted-device (push) 2FA, which is not supported. Use a burner Apple Account with SMS-based 2FA.',
     );
   }
 
