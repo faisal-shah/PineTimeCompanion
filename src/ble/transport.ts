@@ -11,6 +11,8 @@ export const BRIDGE_CHAR = {
   battery: 4,
   eventRead: 5,
   prayerSettings: 6,
+  beaconKey: 7,
+  beaconControl: 8,
 } as const;
 
 export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];

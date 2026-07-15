@@ -60,6 +60,15 @@ export interface SyncBase {
   events: WatchEvent[];
 }
 
+/** Per-watch FindMy beacon config. The private key stays here; only advertisementKeyB64 goes to the watch. */
+export interface BeaconConfig {
+  privateKeyB64: string;
+  advertisementKeyB64: string;
+  hashedKeyId: string;
+  /** true once the advertisement key has been written to this watch */
+  provisioned: boolean;
+}
+
 export interface Watch {
   id: string; // app-internal uuid
   name: string; // e.g. "Layla's watch"
@@ -77,6 +86,8 @@ export interface Watch {
   capacity?: number;
   /** prayer configuration; absent until first configured */
   prayerSettings?: PrayerSettings;
+  /** FindMy beacon key; absent until generated */
+  beacon?: BeaconConfig;
   events: WatchEvent[];
 }
 

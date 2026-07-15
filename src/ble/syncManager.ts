@@ -3,6 +3,7 @@
 
 import { SyncBase, Watch, WatchEvent } from '../model/types';
 import { decodePrayerSettings, encodePrayerSettings, WireSettings } from './prayerProtocol';
+import { BEACON_CONTROL_ENABLE } from './beaconProtocol';
 import { MergeNotice, looksLikeWatchReset, mergeSchedules } from '../model/merge';
 import {
   decodeDigest,
@@ -223,6 +224,41 @@ export async function readPrayerSettings(transport: WatchTransport, deviceId: st
   await transport.connect(deviceId);
   try {
     return decodePrayerSettings(await transport.read(BRIDGE_CHAR.prayerSettings));
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/**
+ * Provision the FindMy advertisement key to the watch (Beacon Service). Writes
+ * the 28-byte key and confirms via the read-back status byte (hasKey == 1).
+ * Normal/connectable mode only.
+ */
+export async function writeBeaconKey(transport: WatchTransport, deviceId: string, advKey: Uint8Array): Promise<void> {
+  if (advKey.length !== 28) {
+    throw new TransportError(`advertisement key must be 28 bytes, got ${advKey.length}`);
+  }
+  await transport.connect(deviceId);
+  try {
+    await transport.write(BRIDGE_CHAR.beaconKey, advKey);
+    const status = await transport.read(BRIDGE_CHAR.beaconKey);
+    if (status.length < 1 || status[0] !== 1) {
+      throw new TransportError('watch did not confirm the beacon key');
+    }
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/**
+ * Enable beacon mode now. The watch becomes non-connectable immediately, so the
+ * connection is expected to drop right after the write; that is success, not an
+ * error. Turning beacon mode OFF is only possible on the watch itself.
+ */
+export async function enableBeacon(transport: WatchTransport, deviceId: string): Promise<void> {
+  await transport.connect(deviceId);
+  try {
+    await transport.write(BRIDGE_CHAR.beaconControl, Uint8Array.of(BEACON_CONTROL_ENABLE));
   } finally {
     await transport.disconnect().catch(() => undefined);
   }
