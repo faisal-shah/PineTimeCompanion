@@ -128,10 +128,11 @@ export async function requestSms(pending: PendingLogin, phoneId: number): Promis
 
 /** Submit the SMS code and finish login, returning the persisted session. */
 export async function submit2fa(pending: PendingLogin, phoneId: number, code: string): Promise<AppleSession> {
-  // The user may take a while to relay the code, so the anisette captured at
-  // login is likely stale by now — refetch fresh before the submit.
-  const freshCtx = { ...pending._ctx, anisette: await getAnisette(pending._overrides) };
-  await submitSmsCode(freshCtx, phoneId, code);
+  // MUST reuse the SAME anisette captured at login: public anisette servers hand
+  // out a fresh machine id (X-Apple-I-MD-M) on every fetch, and Apple binds the
+  // SMS challenge to the machine id that requested the code. Refetching here
+  // yields a different machine id and Apple rejects the code with HTTP 401.
+  await submitSmsCode(pending._ctx, phoneId, code);
   // The session is now trusted server-side; a fresh SRP run yields the tokens.
   return finishLogin(pending._username, pending._password, pending._identity, pending._overrides);
 }
