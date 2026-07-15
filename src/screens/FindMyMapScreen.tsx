@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
 import { Camera, type CameraRef, GeoJSONSource, Layer, Map, Marker } from '@maplibre/maplibre-react-native';
 import circle from '@turf/circle';
 import { RootStackParamList } from '../navigation';
@@ -17,6 +18,10 @@ import { DEFAULT_MAP_STYLE_URL, getFindMySettings } from '../storage/findMySetti
 type Props = NativeStackScreenProps<RootStackParamList, 'FindMyMap'>;
 
 const BATTERY_LABEL = ['Full', 'Medium', 'Low', 'Critical'];
+const RECENTER_ZOOM = 16;
+// Neutral world view for when there's no watch location yet — the map still renders.
+const DEFAULT_VIEW = { center: [0, 20] as [number, number], zoom: 1.4 };
+const PHONE_BLUE = '#3b82f6';
 
 function relativeTime(unixSeconds: number): string {
   const secs = Math.max(0, Date.now() / 1000 - unixSeconds);
@@ -33,11 +38,12 @@ export function FindMyMapScreen({ route, navigation }: Props) {
   const [fixes, setFixes] = useState<LocationFix[]>([]);
   const [session, setSession] = useState<AppleSession | null>(null);
   const [styleUrl, setStyleUrl] = useState(DEFAULT_MAP_STYLE_URL);
+  const [phone, setPhone] = useState<{ lon: number; lat: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const cameraRef = useRef<CameraRef>(null);
-  const RECENTER_ZOOM = 16;
 
   useEffect(() => {
     getFindMySettings().then((s) => setStyleUrl(s.mapStyleUrl));
@@ -63,10 +69,30 @@ export function FindMyMapScreen({ route, navigation }: Props) {
     [last],
   );
 
-  // Snap the camera back to the last-known pin — purely local, no network.
-  const recenter = () => {
+  // Snap the camera back to the last-known watch pin — purely local, no network.
+  const recenterWatch = () => {
     if (last) {
       cameraRef.current?.easeTo({ center: [last.lon, last.lat], zoom: RECENTER_ZOOM, duration: 400 });
+    }
+  };
+
+  // Center on the PHONE's own GPS location (device location permission).
+  const locateMe = async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location permission needed', 'Allow location access to center the map on your phone.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const p = { lon: pos.coords.longitude, lat: pos.coords.latitude };
+      setPhone(p);
+      cameraRef.current?.easeTo({ center: [p.lon, p.lat], zoom: RECENTER_ZOOM, duration: 500 });
+    } catch (e) {
+      Alert.alert('Could not get your location', (e as Error).message);
+    } finally {
+      setLocating(false);
     }
   };
 
@@ -108,54 +134,60 @@ export function FindMyMapScreen({ route, navigation }: Props) {
     return null;
   }
 
+  const initialCenter = last ? { center: [last.lon, last.lat] as [number, number], zoom: RECENTER_ZOOM } : DEFAULT_VIEW;
+
   return (
     <View style={styles.container}>
       <View style={styles.mapArea}>
-        {last ? (
-          <Map style={styles.map} mapStyle={styleUrl}>
-            <Camera ref={cameraRef} initialViewState={{ center: [last.lon, last.lat], zoom: RECENTER_ZOOM }} />
-            {accuracyCircle && (
-              <GeoJSONSource id="accuracy" data={accuracyCircle as any}>
-                <Layer id="accuracy-fill" type="fill" paint={{ 'fill-color': colors.accent, 'fill-opacity': 0.15 }} />
-              </GeoJSONSource>
-            )}
-            {fixes.length > 1 && (
-              <GeoJSONSource id="trail" data={trail as any}>
-                <Layer
-                  id="trail-line"
-                  type="line"
-                  paint={{ 'line-color': colors.accent, 'line-width': 3, 'line-opacity': 0.8 }}
-                />
-              </GeoJSONSource>
-            )}
+        <Map style={styles.map} mapStyle={styleUrl}>
+          <Camera ref={cameraRef} initialViewState={initialCenter} />
+          {accuracyCircle && (
+            <GeoJSONSource id="accuracy" data={accuracyCircle as any}>
+              <Layer id="accuracy-fill" type="fill" paint={{ 'fill-color': colors.accent, 'fill-opacity': 0.15 }} />
+            </GeoJSONSource>
+          )}
+          {fixes.length > 1 && (
+            <GeoJSONSource id="trail" data={trail as any}>
+              <Layer id="trail-line" type="line" paint={{ 'line-color': colors.accent, 'line-width': 3, 'line-opacity': 0.8 }} />
+            </GeoJSONSource>
+          )}
+          {last && (
             <Marker id="last" lngLat={[last.lon, last.lat]}>
               <View style={styles.pin} />
             </Marker>
-          </Map>
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              No location yet for this watch. Turn Find My on and keep it near iPhones for 15–60 minutes, then refresh.
-            </Text>
-          </View>
-        )}
+          )}
+          {phone && (
+            <Marker id="phone" lngLat={[phone.lon, phone.lat]}>
+              <View style={styles.phonePin} />
+            </Marker>
+          )}
+        </Map>
 
         <View style={[styles.overlay, { paddingTop: insets.top + spacing(1) }]} pointerEvents="box-none">
-          {last && (
+          {last ? (
             <View style={styles.badge}>
               <Text style={styles.badgeTitle}>Last seen {relativeTime(last.timestamp)}</Text>
               <Text style={styles.badgeBody}>
                 ±{last.accuracy} m · Battery: {BATTERY_LABEL[last.battery] ?? '—'}
               </Text>
             </View>
+          ) : (
+            <View style={styles.badge}>
+              <Text style={styles.badgeBody}>No watch location yet — sign in and refresh, or wait for the watch to be seen.</Text>
+            </View>
           )}
         </View>
 
-        {last && (
-          <Pressable style={styles.recenter} onPress={recenter} testID="map-recenter" hitSlop={8}>
-            <Text style={styles.recenterGlyph}>◎</Text>
+        <View style={styles.fabColumn}>
+          <Pressable style={styles.fab} onPress={locateMe} disabled={locating} testID="map-locate-me" hitSlop={8}>
+            {locating ? <ActivityIndicator color={PHONE_BLUE} /> : <Text style={[styles.fabGlyph, { color: PHONE_BLUE }]}>◉</Text>}
           </Pressable>
-        )}
+          {last && (
+            <Pressable style={styles.fab} onPress={recenterWatch} testID="map-recenter" hitSlop={8}>
+              <Text style={[styles.fabGlyph, { color: colors.accent }]}>◎</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing(1) }]}>
@@ -176,26 +208,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   mapArea: { flex: 1 },
   map: { flex: 1 },
-  recenter: {
-    position: 'absolute',
-    right: spacing(2),
-    bottom: spacing(2),
+  fabColumn: { position: 'absolute', right: spacing(2), bottom: spacing(2), gap: spacing(1) },
+  fab: {
     width: 48,
     height: 48,
     borderRadius: 24,
     backgroundColor: 'rgba(16,20,24,0.9)',
     borderWidth: 1,
-    borderColor: colors.accent,
+    borderColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recenterGlyph: { color: colors.accent, fontSize: 26, lineHeight: 28 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing(3) },
-  emptyText: { color: colors.textDim, fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  fabGlyph: { fontSize: 26, lineHeight: 28 },
   pin: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
+  phonePin: { width: 18, height: 18, borderRadius: 9, backgroundColor: PHONE_BLUE, borderWidth: 3, borderColor: '#fff' },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', paddingHorizontal: spacing(2) },
   badge: { backgroundColor: 'rgba(16,20,24,0.85)', borderRadius: 10, paddingHorizontal: spacing(2), paddingVertical: spacing(1) },
-  badgeTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  badgeTitle: { color: colors.text, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   badgeBody: { color: colors.textDim, fontSize: 13, marginTop: 2, textAlign: 'center' },
   footer: { padding: spacing(2), backgroundColor: colors.background },
   error: { color: colors.danger, marginBottom: spacing(1), fontSize: 14 },
