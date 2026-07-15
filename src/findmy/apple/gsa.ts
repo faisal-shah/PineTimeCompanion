@@ -5,6 +5,7 @@
 // the PET token used to obtain the search-party token (mobileme.ts).
 
 import * as plist from 'plist';
+import { parsePlist } from './plistParse';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 import { cbc } from '@noble/ciphers/aes.js';
@@ -43,7 +44,7 @@ function decryptSpd(sessionKey: Uint8Array, data: Uint8Array): Record<string, an
       "<!DOCTYPE plist PUBLIC '-//Apple//DTD PLIST 1.0//EN' 'http://www.apple.com/DTDs/PropertyList-1.0.dtd'>" +
       xml;
   }
-  return plist.parse(xml) as Record<string, any>;
+  return parsePlist(xml) as Record<string, any>;
 }
 
 async function gsaRequest(
@@ -68,7 +69,7 @@ async function gsaRequest(
   if (!resp.ok) {
     throw new Error(`GSA request failed: HTTP ${resp.status}`);
   }
-  const parsed = plist.parse(await resp.text()) as Record<string, any>;
+  const parsed = parsePlist(await resp.text()) as Record<string, any>;
   return parsed.Response as Record<string, any>;
 }
 

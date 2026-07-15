@@ -2,6 +2,7 @@
 // reports. Port of FindMy.py's _login_mobileme.
 
 import * as plist from 'plist';
+import { parsePlist } from './plistParse';
 import { Buffer } from 'buffer';
 import { AnisetteData, DeviceIdentity, buildHeaders } from './anisette';
 
@@ -38,7 +39,7 @@ export async function loginMobileMe(
     },
     body,
   });
-  const data = plist.parse(await resp.text()) as Record<string, any>;
+  const data = parsePlist(await resp.text()) as Record<string, any>;
 
   const mm = data?.delegates?.['com.apple.mobileme'] ?? {};
   const status = mm.status ?? data.status;
