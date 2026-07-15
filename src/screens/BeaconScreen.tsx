@@ -9,6 +9,7 @@ import { BeaconConfig } from '../model/types';
 import { advertisementKeyBytes, generateFindMyKey, keyFileContents, keyFileName } from '../beacon/findMyKeys';
 import { enableBeacon, writeBeaconKey } from '../ble/syncManager';
 import { makeTransport } from '../ble/transportFactory';
+import { getBeaconPrivateKey, saveBeaconPrivateKey } from '../secure/secrets';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Beacon'>;
 
@@ -25,15 +26,23 @@ export function BeaconScreen({ route }: Props) {
 
   const setBeacon = (b: BeaconConfig) => upsertWatch({ ...watch, beacon: b });
 
+  // Generate a keypair, stash the private key in the OS keystore, and persist
+  // only the non-secret parts on the watch record.
+  const doGenerate = async () => {
+    const k = generateFindMyKey();
+    await saveBeaconPrivateKey(watch.id, k.privateKeyB64!);
+    setBeacon({ advertisementKeyB64: k.advertisementKeyB64, hashedKeyId: k.hashedKeyId, provisioned: false });
+  };
+
   const generate = () => {
     if (beacon) {
       Alert.alert('Replace key?', 'This watch already has a Find My key. Generating a new one abandons the old one (any pending location reports for it become unreachable).', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Replace', style: 'destructive', onPress: () => setBeacon({ ...generateFindMyKey(), provisioned: false }) },
+        { text: 'Replace', style: 'destructive', onPress: () => void doGenerate() },
       ]);
       return;
     }
-    setBeacon({ ...generateFindMyKey(), provisioned: false });
+    void doGenerate();
   };
 
   const provision = async () => {
@@ -88,7 +97,13 @@ export function BeaconScreen({ route }: Props) {
       return;
     }
     try {
-      await Share.share({ message: keyFileContents(beacon), title: keyFileName(beacon) });
+      const privateKeyB64 = await getBeaconPrivateKey(watch.id);
+      if (!privateKeyB64) {
+        Alert.alert('No private key', 'This key was made on another phone; only the phone that generated it can export it.');
+        return;
+      }
+      const full = { ...beacon, privateKeyB64 };
+      await Share.share({ message: keyFileContents(full), title: keyFileName(full) });
     } catch (e) {
       Alert.alert('Export failed', (e as Error).message);
     }

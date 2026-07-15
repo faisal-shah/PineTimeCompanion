@@ -10,6 +10,7 @@ import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
 import { loadWatches, saveWatches, WatchStore, WatchStoreContext } from './src/storage/store';
+import { migrateSecrets } from './src/secure/secrets';
 import { Watch } from './src/model/types';
 import { colors } from './src/ui/theme';
 
@@ -25,7 +26,15 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    loadWatches().then((w) => {
+    loadWatches().then(async (w) => {
+      // Move any beacon private key still embedded in the persisted blob into
+      // the OS keystore, then persist the blanked records (the save effect below
+      // fires because `loaded` flips true with the migrated list in state).
+      const migrated = await migrateSecrets(w);
+      if (migrated.length) {
+        const byId = new Map(migrated.map((m) => [m.id, m]));
+        w = w.map((x) => byId.get(x.id) ?? x);
+      }
       setWatches(w);
       setLoaded(true);
     });

@@ -45,7 +45,7 @@ export function generateFindMyKey(): FindMyKey {
 }
 
 /** The 28 raw advertisement-key bytes to write to the watch. */
-export function advertisementKeyBytes(key: FindMyKey): Uint8Array {
+export function advertisementKeyBytes(key: Pick<FindMyKey, 'advertisementKeyB64'>): Uint8Array {
   const bytes = Buffer.from(key.advertisementKeyB64, 'base64');
   if (bytes.length !== ADV_KEY_SIZE) {
     throw new Error(`advertisement key must be ${ADV_KEY_SIZE} bytes, got ${bytes.length}`);

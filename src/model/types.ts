@@ -60,9 +60,15 @@ export interface SyncBase {
   events: WatchEvent[];
 }
 
-/** Per-watch FindMy beacon config. The private key stays here; only advertisementKeyB64 goes to the watch. */
+/** Per-watch FindMy beacon config. Only advertisementKeyB64 goes to the watch. */
 export interface BeaconConfig {
-  privateKeyB64: string;
+  /**
+   * 28-byte P-224 private key, base64. Secret — lives in the OS keystore
+   * (src/secure/secrets.ts), NOT persisted here. Present only transiently in
+   * memory between generate and provision, and blanked by migrateSecrets on
+   * older records. Read it via getBeaconPrivateKey(watch.id).
+   */
+  privateKeyB64?: string;
   advertisementKeyB64: string;
   hashedKeyId: string;
   /** true once the advertisement key has been written to this watch */

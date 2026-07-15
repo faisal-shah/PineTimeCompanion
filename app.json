@@ -39,7 +39,7 @@
         }
       ],
       "./plugins/withAbiSplits.js",
-      "expo-build-properties"
+      "expo-secure-store"
     ]
   }
 }
