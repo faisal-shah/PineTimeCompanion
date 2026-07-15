@@ -42,7 +42,13 @@
       ],
       "identity": null
     },
-    "artifactName": "PineTimeCompanion-${version}-${os}-${arch}.${ext}"
+    "artifactName": "PineTimeCompanion-${version}-${os}-${arch}.${ext}",
+    "nsis": {
+      "artifactName": "PineTimeCompanion-${version}-win-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "PineTimeCompanion-${version}-win-portable.${ext}"
+    }
   },
   "author": "Faisal Shah"
 }
