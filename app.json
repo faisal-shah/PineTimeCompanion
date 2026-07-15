@@ -39,6 +39,7 @@
         }
       ],
       "./plugins/withAbiSplits.js",
+      "./plugins/withAppleRootCA.js",
       "expo-secure-store",
       "@maplibre/maplibre-react-native"
     ]
