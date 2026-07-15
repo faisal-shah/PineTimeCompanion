@@ -52,10 +52,20 @@ The whole app runs against InfiniSim through its TCP GATT bridge:
 
 # 2. this app on the Android emulator (tb_emu)
 npm install
-npx expo run:android          # or: npx expo start + a previously installed dev build
+npx expo run:android          # first build/install of the dev client
+npm run android:emu           # start Metro + open the app (use this for the day-to-day loop)
 
 # 3. in the app: add a watch -> Pair -> "Use simulator"
 ```
+
+**Dev-server note (important):** `adb reverse` is unreliable on the tb_emu emulator, so
+the default `expo run:android` flow (which points the app at `localhost:8081` via reverse)
+can get stuck on "Unable to load script". `npm run android:emu` (`scripts/dev-emu.sh`)
+works around it by pointing both Metro and the dev client at `10.0.2.2` (the emulator's
+host alias), which always works. This also depends on the network-security-config in
+`plugins/withAppleRootCA.js` permitting cleartext to `10.0.2.2`/`localhost` — without that,
+the plain-HTTP Metro connection is blocked. If the loop ever breaks, a cold boot of the
+emulator (`-no-snapshot -wipe-data`) restores a clean state.
 
 The emulator reaches the host's bridge at `10.0.2.2:18632`. Every protocol byte and
 firmware code path is identical to real BLE; only the radio is replaced by TCP

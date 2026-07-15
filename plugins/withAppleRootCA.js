@@ -15,6 +15,16 @@ const path = require('path');
 
 const NSC_XML = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Permit cleartext to the loopback / emulator dev-server hosts so the RN
+         Metro bundler still works in debug. Providing a network-security-config
+         otherwise overrides Expo's default debug cleartext allowance and breaks
+         "expo start" ("CLEARTEXT communication to 10.0.2.2 not permitted"). These
+         are loopback / emulator addresses, never real servers, so this is safe. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
     <domain-config>
         <domain includeSubdomains="true">apple.com</domain>
         <domain includeSubdomains="true">icloud.com</domain>
