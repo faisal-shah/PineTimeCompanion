@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Camera, GeoJSONSource, Layer, Map, Marker } from '@maplibre/maplibre-react-native';
+import { Camera, type CameraRef, GeoJSONSource, Layer, Map, Marker } from '@maplibre/maplibre-react-native';
 import circle from '@turf/circle';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
@@ -36,6 +36,8 @@ export function FindMyMapScreen({ route, navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const cameraRef = useRef<CameraRef>(null);
+  const RECENTER_ZOOM = 16;
 
   useEffect(() => {
     getFindMySettings().then((s) => setStyleUrl(s.mapStyleUrl));
@@ -61,6 +63,13 @@ export function FindMyMapScreen({ route, navigation }: Props) {
     [last],
   );
 
+  // Snap the camera back to the last-known pin — purely local, no network.
+  const recenter = () => {
+    if (last) {
+      cameraRef.current?.easeTo({ center: [last.lon, last.lat], zoom: RECENTER_ZOOM, duration: 400 });
+    }
+  };
+
   const refresh = async () => {
     if (!watch) return;
     if (!session) {
@@ -74,6 +83,10 @@ export function FindMyMapScreen({ route, navigation }: Props) {
       const settings = await getFindMySettings();
       const result = await getWatchLocations(watch, session, settings.anisetteServers);
       setFixes(result.fixes);
+      const newest = result.fixes[result.fixes.length - 1];
+      if (newest) {
+        cameraRef.current?.easeTo({ center: [newest.lon, newest.lat], zoom: RECENTER_ZOOM, duration: 500 });
+      }
       setNote(
         result.fixes.length
           ? `${result.reportsFetched} report(s) fetched`
@@ -97,43 +110,51 @@ export function FindMyMapScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {last ? (
-        <Map style={styles.map} mapStyle={styleUrl}>
-          <Camera key={`${last.lon},${last.lat}`} initialViewState={{ center: [last.lon, last.lat], zoom: 15 }} />
-          {accuracyCircle && (
-            <GeoJSONSource id="accuracy" data={accuracyCircle as any}>
-              <Layer id="accuracy-fill" type="fill" paint={{ 'fill-color': colors.accent, 'fill-opacity': 0.15 }} />
-            </GeoJSONSource>
-          )}
-          {fixes.length > 1 && (
-            <GeoJSONSource id="trail" data={trail as any}>
-              <Layer
-                id="trail-line"
-                type="line"
-                paint={{ 'line-color': colors.accent, 'line-width': 3, 'line-opacity': 0.8 }}
-              />
-            </GeoJSONSource>
-          )}
-          <Marker id="last" lngLat={[last.lon, last.lat]}>
-            <View style={styles.pin} />
-          </Marker>
-        </Map>
-      ) : (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            No location yet for this watch. Turn Find My on and keep it near iPhones for 15–60 minutes, then refresh.
-          </Text>
-        </View>
-      )}
-
-      <View style={[styles.overlay, { paddingTop: insets.top + spacing(1) }]} pointerEvents="box-none">
-        {last && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeTitle}>Last seen {relativeTime(last.timestamp)}</Text>
-            <Text style={styles.badgeBody}>
-              ±{last.accuracy} m · Battery: {BATTERY_LABEL[last.battery] ?? '—'}
+      <View style={styles.mapArea}>
+        {last ? (
+          <Map style={styles.map} mapStyle={styleUrl}>
+            <Camera ref={cameraRef} initialViewState={{ center: [last.lon, last.lat], zoom: RECENTER_ZOOM }} />
+            {accuracyCircle && (
+              <GeoJSONSource id="accuracy" data={accuracyCircle as any}>
+                <Layer id="accuracy-fill" type="fill" paint={{ 'fill-color': colors.accent, 'fill-opacity': 0.15 }} />
+              </GeoJSONSource>
+            )}
+            {fixes.length > 1 && (
+              <GeoJSONSource id="trail" data={trail as any}>
+                <Layer
+                  id="trail-line"
+                  type="line"
+                  paint={{ 'line-color': colors.accent, 'line-width': 3, 'line-opacity': 0.8 }}
+                />
+              </GeoJSONSource>
+            )}
+            <Marker id="last" lngLat={[last.lon, last.lat]}>
+              <View style={styles.pin} />
+            </Marker>
+          </Map>
+        ) : (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>
+              No location yet for this watch. Turn Find My on and keep it near iPhones for 15–60 minutes, then refresh.
             </Text>
           </View>
+        )}
+
+        <View style={[styles.overlay, { paddingTop: insets.top + spacing(1) }]} pointerEvents="box-none">
+          {last && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeTitle}>Last seen {relativeTime(last.timestamp)}</Text>
+              <Text style={styles.badgeBody}>
+                ±{last.accuracy} m · Battery: {BATTERY_LABEL[last.battery] ?? '—'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {last && (
+          <Pressable style={styles.recenter} onPress={recenter} testID="map-recenter" hitSlop={8}>
+            <Text style={styles.recenterGlyph}>◎</Text>
+          </Pressable>
         )}
       </View>
 
@@ -153,7 +174,22 @@ export function FindMyMapScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  mapArea: { flex: 1 },
   map: { flex: 1 },
+  recenter: {
+    position: 'absolute',
+    right: spacing(2),
+    bottom: spacing(2),
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(16,20,24,0.9)',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recenterGlyph: { color: colors.accent, fontSize: 26, lineHeight: 28 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing(3) },
   emptyText: { color: colors.textDim, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   pin: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
