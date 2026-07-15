@@ -171,24 +171,28 @@ export function BeaconScreen({ route, navigation }: Props) {
       </Text>
 
       <Text style={styles.label}>5. Locate this watch</Text>
+      <Pressable
+        style={[styles.button, !beacon && { opacity: 0.5 }]}
+        onPress={() => navigation.navigate('FindMyMap', { watchId: watch.id })}
+        disabled={!beacon}
+        testID="beacon-map">
+        <Text style={styles.buttonText}>View location on map</Text>
+      </Pressable>
       {session ? (
-        <>
-          <View style={styles.card}>
-            <Text style={styles.status}>Signed in to Apple as</Text>
-            <Text style={styles.mono}>{session.info.accountName || session.username}</Text>
-          </View>
-          <Pressable style={styles.secondaryButton} onPress={() => signOut().then(() => setSession(null))}>
-            <Text style={styles.secondaryText}>Sign out of Apple</Text>
+        <View style={styles.card}>
+          <Text style={styles.status}>Signed in to Apple as {session.info.accountName || session.username}</Text>
+          <Pressable onPress={() => signOut().then(() => setSession(null))}>
+            <Text style={styles.secondaryText}>Sign out</Text>
           </Pressable>
-        </>
+        </View>
       ) : (
-        <Pressable style={styles.button} onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin">
-          <Text style={styles.buttonText}>Sign in to Apple</Text>
+        <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin">
+          <Text style={styles.secondaryText}>Sign in to Apple</Text>
         </Pressable>
       )}
       <Text style={styles.hint}>
         Sign in with a burner Apple ID to pull this watch's crowd-sourced location from Apple's Find My network and show it
-        on a map. Location retrieval is added next.
+        on a map.
       </Text>
     </ScrollView>
   );

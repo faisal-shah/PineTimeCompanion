@@ -10,6 +10,8 @@ import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
 import { AppleLoginScreen } from './src/screens/AppleLoginScreen';
+import { FindMyMapScreen } from './src/screens/FindMyMapScreen';
+import { FindMySettingsScreen } from './src/screens/FindMySettingsScreen';
 import { loadWatches, saveWatches, WatchStore, WatchStoreContext } from './src/storage/store';
 import { migrateSecrets } from './src/secure/secrets';
 import { Watch } from './src/model/types';
@@ -86,6 +88,8 @@ export default function App() {
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
           <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
+          <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />
+          <Stack.Screen name="FindMySettings" component={FindMySettingsScreen} options={{ title: 'Find My settings' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </WatchStoreContext.Provider>
