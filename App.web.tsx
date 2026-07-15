@@ -1,3 +1,9 @@
+// Web/desktop app root: watch management + beacon key handling only. The three
+// Apple Find My screens (AppleLogin, FindMyMap, FindMySettings) are cut at the
+// bundler level — FindMyMapScreen statically imports the native MapLibre module,
+// so those screens must never enter the web module graph. RootStackParamList is
+// shared unchanged (the extra route types erase at compile time).
+
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
@@ -9,9 +15,6 @@ import { EventEditScreen } from './src/screens/EventEditScreen';
 import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
-import { AppleLoginScreen } from './src/screens/AppleLoginScreen';
-import { FindMyMapScreen } from './src/screens/FindMyMapScreen';
-import { FindMySettingsScreen } from './src/screens/FindMySettingsScreen';
 import { WatchStoreContext } from './src/storage/store';
 import { navTheme, stackScreenOptions, useAppBootstrap } from './src/app/useAppBootstrap';
 
@@ -35,9 +38,6 @@ export default function App() {
           <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
-          <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
-          <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />
-          <Stack.Screen name="FindMySettings" component={FindMySettingsScreen} options={{ title: 'Find My settings' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </WatchStoreContext.Provider>

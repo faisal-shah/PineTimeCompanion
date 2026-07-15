@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -28,14 +29,14 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   const withTransport = async (label: string, fn: (deviceId: string) => Promise<void>) => {
     if (!watch.deviceId) {
-      Alert.alert('Not paired', 'Pair this watch first (Pair button above).');
+      showAlert('Not paired', 'Pair this watch first (Pair button above).');
       return;
     }
     setBusy(label);
     try {
       await fn(watch.deviceId);
     } catch (e) {
-      Alert.alert(`${label} failed`, (e as Error).message);
+      showAlert(`${label} failed`, (e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -52,12 +53,12 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       lastSyncAt: new Date().toISOString(),
     });
     if (result.notices.length > 0) {
-      Alert.alert(
+      showAlert(
         'Merged changes from another device',
         result.notices.map((n) => `• ${n.title}: ${n.detail}`).join('\n')
       );
     } else {
-      Alert.alert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.events.length} events on the watch.`);
+      showAlert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.events.length} events on the watch.`);
     }
   };
 
@@ -67,16 +68,16 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         applySync(await syncWatch(makeTransport(deviceId), watch));
       } catch (e) {
         if (e instanceof WatchResetError) {
-          Alert.alert(
+          showAlert(
             'Watch looks new or reset',
             'Its schedule is empty but this phone has synced with it before. Restore this phone\u2019s schedule to the watch?',
             [
               { text: 'Start fresh (keep watch empty)', style: 'destructive',
                 onPress: () => void syncWatch(makeTransport(deviceId), { ...watch, events: [] }, true)
-                  .then(applySync).catch((err) => Alert.alert('Sync failed', (err as Error).message)) },
+                  .then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)) },
               { text: 'Restore from this phone',
                 onPress: () => void syncWatch(makeTransport(deviceId), watch, true)
-                  .then(applySync).catch((err) => Alert.alert('Sync failed', (err as Error).message)) },
+                  .then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)) },
             ]
           );
           return;
@@ -88,7 +89,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   const doSetTime = () =>
     withTransport('Set time', async (deviceId) => {
       await setWatchTime(makeTransport(deviceId), deviceId);
-      Alert.alert('Time set', 'Watch clock updated.');
+      showAlert('Time set', 'Watch clock updated.');
     });
 
   const doBattery = () =>
@@ -99,7 +100,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   const doMessage = () => {
     if (!watch.deviceId) {
-      Alert.alert('Not paired', 'Pair this watch first (Pair button above).');
+      showAlert('Not paired', 'Pair this watch first (Pair button above).');
       return;
     }
     setComposeText('');
@@ -114,12 +115,12 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     setComposeOpen(false);
     void withTransport('Message', async (deviceId) => {
       await sendMessageToWatch(makeTransport(deviceId), deviceId, 'Message', text);
-      Alert.alert('Sent', `On its way to ${watch.name}'s watch.`);
+      showAlert('Sent', `On its way to ${watch.name}'s watch.`);
     });
   };
 
   const deleteEvent = (eventId: number) => {
-    Alert.alert('Delete event?', 'It will be removed from the watch at the next sync.', [
+    showAlert('Delete event?', 'It will be removed from the watch at the next sync.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -136,7 +137,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   const addEvent = () => {
     if (atCapacity) {
-      Alert.alert('Watch is full', `All ${capacity} event slots are used. Delete an event first (long-press one).`);
+      showAlert('Watch is full', `All ${capacity} event slots are used. Delete an event first (long-press one).`);
       return;
     }
     navigation.navigate('EventEdit', { watchId: watch.id });

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -132,7 +133,7 @@ export function PrayerSettingsScreen({ route }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Location permission needed', 'Grant location access, or enter coordinates manually.');
+        showAlert('Location permission needed', 'Grant location access, or enter coordinates manually.');
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -140,7 +141,7 @@ export function PrayerSettingsScreen({ route }: Props) {
       setLonText(pos.coords.longitude.toFixed(2));
       setUtcQuarters(phoneUtcQuarters());
     } catch (e) {
-      Alert.alert('Could not get location', (e as Error).message);
+      showAlert('Could not get location', (e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -152,11 +153,11 @@ export function PrayerSettingsScreen({ route }: Props) {
 
   const apply = async () => {
     if (!valid) {
-      Alert.alert('Check the location', settingsOrNull as string);
+      showAlert('Check the location', settingsOrNull as string);
       return;
     }
     if (!watch.deviceId) {
-      Alert.alert('Not paired', 'Pair this watch first from its watch screen.');
+      showAlert('Not paired', 'Pair this watch first from its watch screen.');
       return;
     }
     const s = settingsOrNull as WireSettings;
@@ -164,9 +165,9 @@ export function PrayerSettingsScreen({ route }: Props) {
     try {
       await writePrayerSettings(makeTransport(watch.deviceId), watch.deviceId, s);
       persist(s);
-      Alert.alert('Applied', `Prayer settings are on ${watch.name}'s watch (verified).`);
+      showAlert('Applied', `Prayer settings are on ${watch.name}'s watch (verified).`);
     } catch (e) {
-      Alert.alert('Apply failed', (e as Error).message);
+      showAlert('Apply failed', (e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -174,7 +175,7 @@ export function PrayerSettingsScreen({ route }: Props) {
 
   const readFromWatch = async () => {
     if (!watch.deviceId) {
-      Alert.alert('Not paired', 'Pair this watch first from its watch screen.');
+      showAlert('Not paired', 'Pair this watch first from its watch screen.');
       return;
     }
     setBusy('Read');
@@ -188,7 +189,7 @@ export function PrayerSettingsScreen({ route }: Props) {
       setUtcQuarters(s.utcOffsetQuarters);
       persist(s);
     } catch (e) {
-      Alert.alert('Read failed', (e as Error).message);
+      showAlert('Read failed', (e as Error).message);
     } finally {
       setBusy(null);
     }

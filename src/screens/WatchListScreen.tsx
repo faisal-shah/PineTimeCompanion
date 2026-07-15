@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -31,7 +32,7 @@ export function WatchListScreen({ navigation }: Props) {
   const addWatch = () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      Alert.alert('Name the watch first', 'e.g. the name of whoever wears it.');
+      showAlert('Name the watch first', 'e.g. the name of whoever wears it.');
       return;
     }
     const watch = newWatch(trimmed);

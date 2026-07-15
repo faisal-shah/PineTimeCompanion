@@ -86,9 +86,11 @@ export function WatchPairScreen({ navigation, route }: Props) {
         <Text style={styles.simButtonSub}>InfiniSim GATT bridge at {SIMULATOR_DEVICE_ID} (dev)</Text>
       </Pressable>
 
-      <Pressable style={styles.scanButton} onPress={scan} disabled={scanState === 'scanning'}>
-        <Text style={styles.scanButtonText}>{scanState === 'scanning' ? 'Scanning…' : 'Scan for real watches'}</Text>
-      </Pressable>
+      {Platform.OS !== 'web' && (
+        <Pressable style={styles.scanButton} onPress={scan} disabled={scanState === 'scanning'}>
+          <Text style={styles.scanButtonText}>{scanState === 'scanning' ? 'Scanning…' : 'Scan for real watches'}</Text>
+        </Pressable>
+      )}
       {!!error && <Text style={styles.error}>{error}</Text>}
 
       <FlatList

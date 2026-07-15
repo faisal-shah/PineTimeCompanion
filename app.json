@@ -21,6 +21,8 @@
       "package": "dev.faisal.pinetimecompanion"
     },
     "web": {
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [

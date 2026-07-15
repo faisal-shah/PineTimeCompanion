@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { showAlert } from '../ui/alert';
+import { exportText } from '../ui/exportText';
 import { BeaconConfig } from '../model/types';
 import { advertisementKeyBytes, generateFindMyKey, keyFileContents, keyFileName } from '../beacon/findMyKeys';
 import { enableBeacon, writeBeaconKey } from '../ble/syncManager';
 import { makeTransport } from '../ble/transportFactory';
 import { getBeaconPrivateKey, saveBeaconPrivateKey } from '../secure/secrets';
-import { AppleSession, loadSession, signOut } from '../findmy/apple/session';
+// Apple Find My is native-only; the session module is loaded lazily inside the
+// guarded effect so its code never runs (and barely weighs) on web.
+import type { AppleSession } from '../findmy/apple/session';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Beacon'>;
 
@@ -22,7 +26,13 @@ export function BeaconScreen({ route, navigation }: Props) {
   const [session, setSession] = useState<AppleSession | null>(null);
 
   useEffect(() => {
-    const refresh = () => loadSession().then(setSession);
+    if (Platform.OS === 'web') {
+      return;
+    }
+    const refresh = () =>
+      import('../findmy/apple/session')
+        .then(({ loadSession }) => loadSession())
+        .then(setSession);
     refresh();
     return navigation.addListener('focus', refresh);
   }, [navigation]);
@@ -44,7 +54,7 @@ export function BeaconScreen({ route, navigation }: Props) {
 
   const generate = () => {
     if (beacon) {
-      Alert.alert('Replace key?', 'This watch already has a Find My key. Generating a new one abandons the old one (any pending location reports for it become unreachable).', [
+      showAlert('Replace key?', 'This watch already has a Find My key. Generating a new one abandons the old one (any pending location reports for it become unreachable).', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Replace', style: 'destructive', onPress: () => void doGenerate() },
       ]);
@@ -58,16 +68,16 @@ export function BeaconScreen({ route, navigation }: Props) {
       return;
     }
     if (!watch.deviceId) {
-      Alert.alert('Not paired', 'Pair this watch first from its watch screen.');
+      showAlert('Not paired', 'Pair this watch first from its watch screen.');
       return;
     }
     setBusy('Provision');
     try {
       await writeBeaconKey(makeTransport(watch.deviceId), watch.deviceId, advertisementKeyBytes(beacon));
       setBeacon({ ...beacon, provisioned: true });
-      Alert.alert('Key on the watch', 'The advertisement key is stored. Turn Find My on from here or on the watch (Settings -> Find My).');
+      showAlert('Key on the watch', 'The advertisement key is stored. Turn Find My on from here or on the watch (Settings -> Find My).');
     } catch (e) {
-      Alert.alert('Provision failed', (e as Error).message);
+      showAlert('Provision failed', (e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -77,7 +87,7 @@ export function BeaconScreen({ route, navigation }: Props) {
     if (!watch.deviceId || !beacon?.provisioned) {
       return;
     }
-    Alert.alert(
+    showAlert(
       'Turn on Find My?',
       'The watch will disconnect and become hidden (non-connectable) so it can broadcast. You can only turn it back off on the watch itself (Settings -> Find My).',
       [
@@ -88,9 +98,9 @@ export function BeaconScreen({ route, navigation }: Props) {
             setBusy('Enable');
             try {
               await enableBeacon(makeTransport(watch.deviceId!), watch.deviceId!);
-              Alert.alert('Find My is on', 'The watch is now hidden and broadcasting. Turn it off on the watch when you want to reconnect.');
+              showAlert('Find My is on', 'The watch is now hidden and broadcasting. Turn it off on the watch when you want to reconnect.');
             } catch (e) {
-              Alert.alert('Could not enable', (e as Error).message);
+              showAlert('Could not enable', (e as Error).message);
             } finally {
               setBusy(null);
             }
@@ -107,13 +117,13 @@ export function BeaconScreen({ route, navigation }: Props) {
     try {
       const privateKeyB64 = await getBeaconPrivateKey(watch.id);
       if (!privateKeyB64) {
-        Alert.alert('No private key', 'This key was made on another phone; only the phone that generated it can export it.');
+        showAlert('No private key', 'This key was made on another phone; only the phone that generated it can export it.');
         return;
       }
       const full = { ...beacon, privateKeyB64 };
-      await Share.share({ message: keyFileContents(full), title: keyFileName(full) });
+      await exportText({ filename: keyFileName(full), title: keyFileName(full), contents: keyFileContents(full) });
     } catch (e) {
-      Alert.alert('Export failed', (e as Error).message);
+      showAlert('Export failed', (e as Error).message);
     }
   };
 
@@ -170,30 +180,39 @@ export function BeaconScreen({ route, navigation }: Props) {
         instance to see this watch's location.
       </Text>
 
-      <Text style={styles.label}>5. Locate this watch</Text>
-      <Pressable
-        style={[styles.button, !beacon && { opacity: 0.5 }]}
-        onPress={() => navigation.navigate('FindMyMap', { watchId: watch.id })}
-        disabled={!beacon}
-        testID="beacon-map">
-        <Text style={styles.buttonText}>View location on map</Text>
-      </Pressable>
-      {session ? (
-        <View style={styles.card}>
-          <Text style={styles.status}>Signed in to Apple as {session.info.accountName || session.username}</Text>
-          <Pressable onPress={() => signOut().then(() => setSession(null))}>
-            <Text style={styles.secondaryText}>Sign out</Text>
+      {Platform.OS !== 'web' && (
+        <>
+          <Text style={styles.label}>5. Locate this watch</Text>
+          <Pressable
+            style={[styles.button, !beacon && { opacity: 0.5 }]}
+            onPress={() => navigation.navigate('FindMyMap', { watchId: watch.id })}
+            disabled={!beacon}
+            testID="beacon-map">
+            <Text style={styles.buttonText}>View location on map</Text>
           </Pressable>
-        </View>
-      ) : (
-        <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin">
-          <Text style={styles.secondaryText}>Sign in to Apple</Text>
-        </Pressable>
+          {session ? (
+            <View style={styles.card}>
+              <Text style={styles.status}>Signed in to Apple as {session.info.accountName || session.username}</Text>
+              <Pressable
+                onPress={() =>
+                  import('../findmy/apple/session')
+                    .then(({ signOut }) => signOut())
+                    .then(() => setSession(null))
+                }>
+                <Text style={styles.secondaryText}>Sign out</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin">
+              <Text style={styles.secondaryText}>Sign in to Apple</Text>
+            </Pressable>
+          )}
+          <Text style={styles.hint}>
+            Sign in with a burner Apple Account to pull this watch's crowd-sourced location from Apple's Find My network and
+            show it on a map.
+          </Text>
+        </>
       )}
-      <Text style={styles.hint}>
-        Sign in with a burner Apple Account to pull this watch's crowd-sourced location from Apple's Find My network and show it
-        on a map.
-      </Text>
     </ScrollView>
   );
 }
