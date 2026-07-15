@@ -28,9 +28,7 @@
       "target": [
         "AppImage"
       ],
-      "category": "Utility",
-      "desktopName": "pinetimecompanion.desktop",
-      "syncDesktopName": true
+      "category": "Utility"
     },
     "win": {
       "target": [
@@ -45,5 +43,6 @@
       "identity": null
     },
     "artifactName": "PineTimeCompanion-${version}-${os}-${arch}.${ext}"
-  }
+  },
+  "author": "Faisal Shah"
 }
