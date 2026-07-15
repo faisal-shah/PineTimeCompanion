@@ -161,8 +161,10 @@ No signing anywhere: APKs use the RN debug keystore (prebuild regenerates the
 same key, so CI and local builds upgrade-install over each other); desktop
 builds are unsigned — macOS users right-click → Open past Gatekeeper (or
 `xattr -dr com.apple.quarantine <app>`), Windows users click through
-SmartScreen. In-browser reconnects re-show the device chooser once per
-session (Chrome gates silent re-grant behind a flag); the Electron shell
+SmartScreen. The dmg is Apple-silicon (arm64) only — GitHub's macOS runners
+are M-series; an Intel dmg is one `mac.target` arch entry away if ever
+needed. In-browser reconnects re-show the device chooser once per session
+(Chrome gates silent re-grant behind a flag); the Electron shell
 auto-reconnects.
 
 ## Architecture
