@@ -12,14 +12,6 @@ import { BridgeCharId, TransportError, WatchTransport } from './transport';
 import { ALL_SERVICE_UUIDS, CHAR_MAP, WATCH_NAME_PREFIXES } from './gattUuids';
 import { getRegisteredDevice, registerDevice } from './webDeviceRegistry';
 
-declare global {
-  interface Window {
-    desktopBluetooth?: {
-      setAutoSelect(target: { id: string; name?: string }): void;
-    };
-  }
-}
-
 export class WebBluetoothTransport implements WatchTransport {
   private device?: BluetoothDevice;
   private server?: BluetoothRemoteGATTServer;

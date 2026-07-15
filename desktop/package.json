@@ -1,0 +1,49 @@
+{
+  "name": "pinetimecompanion-desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PineTime Companion desktop shell (Electron)",
+  "main": "main.js",
+  "scripts": {
+    "dev": "ELECTRON_START_URL=http://localhost:8081 electron .",
+    "start": "electron .",
+    "build": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.2.3",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "dev.faisal.pinetimecompanion",
+    "productName": "PineTime Companion",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "dist/**"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility",
+      "desktopName": "pinetimecompanion.desktop",
+      "syncDesktopName": true
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "identity": null
+    },
+    "artifactName": "PineTimeCompanion-${version}-${os}-${arch}.${ext}"
+  }
+}

@@ -17,6 +17,8 @@ import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
 import { WatchStoreContext } from './src/storage/store';
 import { navTheme, stackScreenOptions, useAppBootstrap } from './src/app/useAppBootstrap';
+import { DesktopBlePicker } from './src/ui/DesktopBlePicker.web';
+import { DesktopBlePairingPrompt } from './src/ui/DesktopBlePairingPrompt.web';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -39,6 +41,9 @@ export default function App() {
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
         </Stack.Navigator>
+        {/* Electron-only Bluetooth overlays; self-disable in plain browsers. */}
+        <DesktopBlePicker />
+        <DesktopBlePairingPrompt />
       </NavigationContainer>
     </WatchStoreContext.Provider>
   );

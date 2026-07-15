@@ -40,3 +40,5 @@ yarn-error.*
 /ios
 /android
 dist-web/
+desktop/dist/
+desktop/release/
