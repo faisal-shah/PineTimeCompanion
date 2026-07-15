@@ -5,6 +5,7 @@
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import Constants from 'expo-constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from './theme';
 
 export function versionLabel(): string {
@@ -15,7 +16,9 @@ export function versionLabel(): string {
 }
 
 export function VersionFooter() {
-  return <Text style={styles.footer}>{versionLabel()}</Text>;
+  const insets = useSafeAreaInsets();
+  // Keep the label above the Android gesture pill / iOS home indicator.
+  return <Text style={[styles.footer, { paddingBottom: spacing(0.5) + insets.bottom }]}>{versionLabel()}</Text>;
 }
 
 const styles = StyleSheet.create({
