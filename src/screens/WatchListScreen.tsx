@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
+import { VersionFooter } from '../ui/VersionFooter';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -91,6 +92,7 @@ export function WatchListScreen({ navigation }: Props) {
           <Text style={styles.addButtonText}>Add</Text>
         </Pressable>
       </View>
+      <VersionFooter />
     </View>
   );
 }

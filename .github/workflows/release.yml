@@ -23,6 +23,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 env:
   TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -48,6 +50,11 @@ jobs:
         run: |
           npx tsc --noEmit
           npm test
+      - name: Stamp build identity
+        run: |
+          echo "APP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
       - name: Generate android project
         run: npx expo prebuild --platform android --no-install
       - name: Build release APKs
@@ -82,6 +89,12 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: npm ci
+      - name: Stamp build identity
+        shell: bash
+        run: |
+          echo "APP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
       - name: Export web bundle
         shell: bash
         run: npx expo export --platform web --output-dir desktop/dist
@@ -106,3 +119,35 @@ jobs:
         run: |
           cd desktop/dist && zip -qr "../../PineTimeCompanion-${TAG#v}-web.zip" .
           cd ../.. && gh release upload "$TAG" "PineTimeCompanion-${TAG#v}-web.zip" --clobber
+
+  pages:
+    # Deploys the web app to https://faisal-shah.github.io/PineTimeCompanion/
+    # on every release (prereleases included, so the site can be checked during
+    # the prerelease window). Separate export from the desktop/zip one: Pages
+    # serves from a subpath, so this build sets WEB_BASE_URL.
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Export web bundle for Pages
+        run: |
+          export APP_VERSION="${TAG#v}"
+          export GIT_COMMIT=$(git rev-parse --short HEAD)
+          export GIT_TAG="$TAG"
+          export WEB_BASE_URL=/PineTimeCompanion
+          npx expo export --platform web --output-dir pages-dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-dist
+      - uses: actions/deploy-pages@v4
+        id: deployment

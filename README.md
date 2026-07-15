@@ -21,7 +21,7 @@ One codebase, four distributables (all built by CI on release — see
 |---|---|---|
 | **Android APK** | `react-native-ble-plx` | everything (incl. Apple Find My login + map) |
 | **Windows / Linux / macOS desktop** (Electron, standalone) | Web Bluetooth (bundled Chromium) | watch management + beacon key generate/provision/export |
-| **Web bundle** (Chrome/Edge) | Web Bluetooth | same as desktop |
+| **Web app** (Chrome/Edge) — hosted at <https://faisal-shah.github.io/PineTimeCompanion/> | Web Bluetooth | same as desktop |
 
 The Apple Find My tracking + map are mobile-only: browsers block the Apple
 endpoints (CORS) and the map module is native. The `.keys` export works
@@ -154,7 +154,12 @@ watch exists: the Web Bluetooth GATT path itself, the passkey flow, and the
 `gh release create vX.Y.Z` (or publish one in the UI) triggers
 `.github/workflows/release.yml`, which attaches every distributable to the
 release: per-ABI Android APKs, Linux AppImage, Windows installer + portable
-exe, macOS dmg, and the web bundle zip. Re-run for an existing tag with the
+exe, macOS dmg, and the web bundle zip — and deploys the web app to
+<https://faisal-shah.github.io/PineTimeCompanion/> (GitHub Pages).
+Prefer `scripts/release.sh X.Y.Z`: it runs the gates, bumps the version,
+and creates the release as a **prerelease** for spot-checking before
+promotion (`gh release edit vX.Y.Z --prerelease=false --latest`). Builds
+are stamped (tag + commit) and show it in the app's footer. Re-run for an existing tag with the
 workflow's manual dispatch. Nothing runs on push/PR.
 
 No signing anywhere: APKs use the RN debug keystore (prebuild regenerates the
