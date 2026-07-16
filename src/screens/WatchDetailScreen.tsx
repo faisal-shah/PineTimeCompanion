@@ -9,6 +9,7 @@ import { colors, spacing } from '../ui/theme';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 import { makeTransport } from '../ble/transportFactory';
 import { readBattery, sendMessageToWatch, setWatchTime } from '../ble/syncManager';
+import { deleteBeaconPrivateKey } from '../secure/secrets';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
 
@@ -23,7 +24,7 @@ const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string
 ];
 
 export function WatchDetailScreen({ navigation, route }: Props) {
-  const { watches, upsertWatch } = useWatchStore();
+  const { watches, upsertWatch, removeWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const [busy, setBusy] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -86,6 +87,28 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   const paired = !!watch.deviceId;
   const lastSync = watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleDateString() : null;
 
+  const unpair = () => {
+    showAlert('Unpair this watch?', `${watch.name} will be forgotten as a connection. The watch itself keeps its data; you can pair again anytime.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Unpair', style: 'destructive', onPress: () => upsertWatch({ ...watch, deviceId: undefined }) },
+    ]);
+  };
+
+  const deleteWatch = () => {
+    showAlert('Delete this watch?', `Removes ${watch.name} and its schedule/keys from this phone. The physical watch is not affected. This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          void deleteBeaconPrivateKey(watch.id).catch(() => undefined); // best-effort secret cleanup
+          removeWatch(watch.id);
+          navigation.goBack();
+        },
+      },
+    ]);
+  };
+
   const featureSubtitle = (key: FeatureKey, fallback: string) =>
     key === 'Schedule'
       ? `${watch.events.length} event${watch.events.length === 1 ? '' : 's'}`
@@ -135,6 +158,11 @@ export function WatchDetailScreen({ navigation, route }: Props) {
           <View style={styles.statusRight}>
             {watch.batteryPercent !== undefined && <Text style={styles.statusMeta}>{watch.batteryPercent}%</Text>}
             {lastSync && <Text style={styles.statusMeta}>synced {lastSync}</Text>}
+            {paired && (
+              <Pressable onPress={unpair} testID="unpair">
+                <Text style={styles.unpairText}>Unpair</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -166,6 +194,10 @@ export function WatchDetailScreen({ navigation, route }: Props) {
           <ActionButton icon="🔋" label={busy === 'Battery' ? '…' : 'Battery'} onPress={doBattery} disabled={busy !== null} />
           <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={busy !== null} />
         </View>
+
+        <Pressable style={styles.deleteButton} onPress={deleteWatch} testID="delete-watch">
+          <Text style={styles.deleteText}>Delete watch</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -187,8 +219,9 @@ const styles = StyleSheet.create({
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   dot: { width: 10, height: 10, borderRadius: 5 },
   statusText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  statusRight: { flexDirection: 'row', gap: spacing(1.5) },
+  statusRight: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5) },
   statusMeta: { color: colors.textDim, fontSize: 13 },
+  unpairText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
 
   featureRow: {
     flexDirection: 'row',
@@ -226,6 +259,9 @@ const styles = StyleSheet.create({
   },
   actionIcon: { fontSize: 22 },
   actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
+
+  deleteButton: { marginTop: spacing(4), alignItems: 'center', paddingVertical: spacing(1.5) },
+  deleteText: { color: colors.danger, fontSize: 15, fontWeight: '600' },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: spacing(2) },
   composeCard: { backgroundColor: colors.card, borderRadius: 14, padding: spacing(2), width: '100%', maxWidth: 420 },
