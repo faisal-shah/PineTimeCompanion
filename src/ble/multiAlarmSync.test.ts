@@ -19,6 +19,10 @@ class MockWatch implements WatchTransport {
     return 64;
   }
   async disconnect(): Promise<void> {}
+  async writeWithoutResponse(): Promise<void> {}
+  async subscribe(): Promise<() => void> {
+    return () => undefined;
+  }
 
   async read(charId: BridgeCharId): Promise<Uint8Array> {
     assert.equal(charId, BRIDGE_CHAR.multiAlarm);

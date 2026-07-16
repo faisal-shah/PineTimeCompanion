@@ -8,6 +8,7 @@ import { BridgeCharId, TransportError, WatchTransport } from './transport';
 import { BridgeResponse, FrameParser, encodeBridgeRequest } from './bridgeFraming';
 
 type Pending = { resolve: (r: BridgeResponse) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
+type Subscriber = (data: Uint8Array) => void;
 
 const REQUEST_TIMEOUT_MS = 5000;
 const CONNECT_TIMEOUT_MS = 5000;
@@ -16,6 +17,7 @@ export class TcpTransport implements WatchTransport {
   private socket?: ReturnType<typeof TcpSocket.createConnection>;
   private parser = new FrameParser();
   private pending: Pending[] = [];
+  private subscribers = new Map<number, Set<Subscriber>>();
 
   async connect(deviceId: string): Promise<void> {
     const [host, portStr] = deviceId.split(':');
@@ -32,17 +34,25 @@ export class TcpTransport implements WatchTransport {
       });
       socket.on('data', (data: unknown) => {
         const chunk = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data as Uint8Array);
-        for (const response of this.parser.feed(chunk)) {
-          const pending = this.pending.shift();
-          if (pending) {
-            clearTimeout(pending.timer);
-            pending.resolve(response);
-          }
-        }
+        this.onFrames(chunk);
       });
       socket.on('close', () => this.failAll(new TransportError('bridge connection closed')));
       this.socket = socket;
     });
+  }
+
+  private onFrames(chunk: Uint8Array) {
+    for (const frame of this.parser.feed(chunk)) {
+      if (frame.kind === 'notify') {
+        this.subscribers.get(frame.charId)?.forEach((cb) => cb(frame.payload));
+        continue;
+      }
+      const pending = this.pending.shift();
+      if (pending) {
+        clearTimeout(pending.timer);
+        pending.resolve(frame);
+      }
+    }
   }
 
   private failAll(error: Error) {
@@ -80,6 +90,14 @@ export class TcpTransport implements WatchTransport {
     }
   }
 
+  async writeWithoutResponse(charId: BridgeCharId, data: Uint8Array): Promise<void> {
+    if (!this.socket) {
+      throw new TransportError('not connected');
+    }
+    // op 2 = write-no-response: the bridge processes but sends no reply frame.
+    this.socket.write(Buffer.from(encodeBridgeRequest(charId, 2, data)) as unknown as Uint8Array & string);
+  }
+
   async read(charId: BridgeCharId): Promise<Uint8Array> {
     const { status, payload } = await this.request(charId, 1, new Uint8Array(0));
     if (status !== 0) {
@@ -88,10 +106,23 @@ export class TcpTransport implements WatchTransport {
     return payload;
   }
 
+  async subscribe(charId: BridgeCharId, cb: Subscriber): Promise<() => void> {
+    // The sim bridge auto-pushes notification frames for every firmware notify,
+    // so subscribing is purely local routing — no CCCD write on the wire.
+    let set = this.subscribers.get(charId);
+    if (!set) {
+      set = new Set();
+      this.subscribers.set(charId, set);
+    }
+    set.add(cb);
+    return () => set!.delete(cb);
+  }
+
   async disconnect(): Promise<void> {
     this.socket?.destroy();
     this.socket = undefined;
     this.parser.reset();
+    this.subscribers.clear();
     this.failAll(new TransportError('disconnected'));
   }
 }

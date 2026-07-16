@@ -39,6 +39,15 @@ export class BleTransport implements WatchTransport {
     await this.device.writeCharacteristicWithResponseForService(service, characteristic, base64);
   }
 
+  async writeWithoutResponse(charId: BridgeCharId, data: Uint8Array): Promise<void> {
+    if (!this.device) {
+      throw new TransportError('not connected');
+    }
+    const { service, characteristic } = CHAR_MAP[charId];
+    const base64 = Buffer.from(data).toString('base64');
+    await this.device.writeCharacteristicWithoutResponseForService(service, characteristic, base64);
+  }
+
   async read(charId: BridgeCharId): Promise<Uint8Array> {
     if (!this.device) {
       throw new TransportError('not connected');
@@ -46,6 +55,20 @@ export class BleTransport implements WatchTransport {
     const { service, characteristic } = CHAR_MAP[charId];
     const result = await this.device.readCharacteristicForService(service, characteristic);
     return new Uint8Array(Buffer.from(result.value ?? '', 'base64'));
+  }
+
+  async subscribe(charId: BridgeCharId, cb: (data: Uint8Array) => void): Promise<() => void> {
+    if (!this.device) {
+      throw new TransportError('not connected');
+    }
+    const { service, characteristic } = CHAR_MAP[charId];
+    const sub = this.device.monitorCharacteristicForService(service, characteristic, (error, ch) => {
+      if (error || !ch?.value) {
+        return;
+      }
+      cb(new Uint8Array(Buffer.from(ch.value, 'base64')));
+    });
+    return () => sub.remove();
   }
 
   async disconnect(): Promise<void> {

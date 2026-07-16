@@ -6,6 +6,7 @@ import { BridgeCharId, TransportError, WatchTransport } from './transport';
 import { BridgeResponse, FrameParser, encodeBridgeRequest } from './bridgeFraming';
 
 type Pending = { resolve: (r: BridgeResponse) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
+type Subscriber = (data: Uint8Array) => void;
 
 const REQUEST_TIMEOUT_MS = 5000;
 const CONNECT_TIMEOUT_MS = 5000;
@@ -14,6 +15,7 @@ export class WsTransport implements WatchTransport {
   private socket?: WebSocket;
   private parser = new FrameParser();
   private pending: Pending[] = [];
+  private subscribers = new Map<number, Set<Subscriber>>();
 
   async connect(deviceId: string): Promise<void> {
     const [host, portStr] = deviceId.split(':');
@@ -35,18 +37,25 @@ export class WsTransport implements WatchTransport {
         reject(new TransportError(`cannot reach ws-tcp proxy at ${host}:${port} — is "npm run sim:proxy" running?`));
       };
       socket.onmessage = (event: MessageEvent) => {
-        const chunk = new Uint8Array(event.data as ArrayBuffer);
-        for (const response of this.parser.feed(chunk)) {
-          const pending = this.pending.shift();
-          if (pending) {
-            clearTimeout(pending.timer);
-            pending.resolve(response);
-          }
-        }
+        this.onFrames(new Uint8Array(event.data as ArrayBuffer));
       };
       socket.onclose = () => this.failAll(new TransportError('proxy connection closed'));
       this.socket = socket;
     });
+  }
+
+  private onFrames(chunk: Uint8Array) {
+    for (const frame of this.parser.feed(chunk)) {
+      if (frame.kind === 'notify') {
+        this.subscribers.get(frame.charId)?.forEach((cb) => cb(frame.payload));
+        continue;
+      }
+      const pending = this.pending.shift();
+      if (pending) {
+        clearTimeout(pending.timer);
+        pending.resolve(frame);
+      }
+    }
   }
 
   private failAll(error: Error) {
@@ -84,12 +93,30 @@ export class WsTransport implements WatchTransport {
     }
   }
 
+  async writeWithoutResponse(charId: BridgeCharId, data: Uint8Array): Promise<void> {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      throw new TransportError('not connected');
+    }
+    this.socket.send(encodeBridgeRequest(charId, 2, data));
+  }
+
   async read(charId: BridgeCharId): Promise<Uint8Array> {
     const { status, payload } = await this.request(charId, 1, new Uint8Array(0));
     if (status !== 0) {
       throw new TransportError(`read of char ${charId} rejected (status ${status})`);
     }
     return payload;
+  }
+
+  async subscribe(charId: BridgeCharId, cb: Subscriber): Promise<() => void> {
+    // The sim bridge auto-pushes notification frames; subscribing is local routing.
+    let set = this.subscribers.get(charId);
+    if (!set) {
+      set = new Set();
+      this.subscribers.set(charId, set);
+    }
+    set.add(cb);
+    return () => set!.delete(cb);
   }
 
   async disconnect(): Promise<void> {
@@ -99,6 +126,7 @@ export class WsTransport implements WatchTransport {
       this.socket = undefined;
     }
     this.parser.reset();
+    this.subscribers.clear();
     this.failAll(new TransportError('disconnected'));
   }
 }

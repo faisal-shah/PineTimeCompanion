@@ -108,6 +108,33 @@ export class WebBluetoothTransport implements WatchTransport {
     });
   }
 
+  writeWithoutResponse(charId: BridgeCharId, data: Uint8Array): Promise<void> {
+    return this.locked(async () => {
+      const c = await this.char(charId);
+      try {
+        await c.writeValueWithoutResponse(data as BufferSource);
+      } catch (e) {
+        throw new TransportError(`write to char ${charId} failed: ${(e as Error).message}`, e);
+      }
+    });
+  }
+
+  async subscribe(charId: BridgeCharId, cb: (data: Uint8Array) => void): Promise<() => void> {
+    const c = await this.locked(() => this.char(charId));
+    const listener = (event: Event) => {
+      const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+      if (value) {
+        cb(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+      }
+    };
+    c.addEventListener('characteristicvaluechanged', listener);
+    await this.locked(() => c.startNotifications());
+    return () => {
+      c.removeEventListener('characteristicvaluechanged', listener);
+      c.stopNotifications().catch(() => undefined);
+    };
+  }
+
   read(charId: BridgeCharId): Promise<Uint8Array> {
     return this.locked(async () => {
       const c = await this.char(charId);
