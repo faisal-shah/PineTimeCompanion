@@ -14,6 +14,7 @@ import { WatchDetailScreen } from './src/screens/WatchDetailScreen';
 import { EventEditScreen } from './src/screens/EventEditScreen';
 import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
+import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
 import { WatchStoreContext } from './src/storage/store';
 import { navTheme, stackScreenOptions, useAppBootstrap } from './src/app/useAppBootstrap';
@@ -39,6 +40,7 @@ export default function App() {
           <Stack.Screen name="EventEdit" component={EventEditScreen} options={{ title: 'Event' }} />
           <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
+          <Stack.Screen name="Alarms" component={AlarmsScreen} options={{ title: 'Alarms' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
         </Stack.Navigator>
         {/* Electron-only Bluetooth overlays; self-disable in plain browsers. */}

@@ -8,6 +8,7 @@ import { WatchDetailScreen } from './src/screens/WatchDetailScreen';
 import { EventEditScreen } from './src/screens/EventEditScreen';
 import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
+import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
 import { AppleLoginScreen } from './src/screens/AppleLoginScreen';
 import { FindMyMapScreen } from './src/screens/FindMyMapScreen';
@@ -34,6 +35,7 @@ export default function App() {
           <Stack.Screen name="EventEdit" component={EventEditScreen} options={{ title: 'Event' }} />
           <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
+          <Stack.Screen name="Alarms" component={AlarmsScreen} options={{ title: 'Alarms' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
           <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
           <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />

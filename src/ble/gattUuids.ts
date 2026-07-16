@@ -8,6 +8,7 @@ import { BridgeCharId, BRIDGE_CHAR } from './transport';
 import { SCHEDULE_SERVICE_UUID, SYNC_COMMAND_CHAR_UUID, DIGEST_CHAR_UUID, EVENT_READ_CHAR_UUID } from './scheduleProtocol';
 import { PRAYER_SERVICE_UUID, PRAYER_SETTINGS_CHAR_UUID } from './prayerProtocol';
 import { BEACON_SERVICE_UUID, BEACON_KEY_CHAR_UUID, BEACON_CONTROL_CHAR_UUID } from './beaconProtocol';
+import { MULTIALARM_SERVICE_UUID, MULTIALARM_CHAR_UUID } from './multiAlarmProtocol';
 
 // Standard GATT services the companion basics use.
 const CTS_SERVICE = '00001805-0000-1000-8000-00805f9b34fb';
@@ -27,6 +28,7 @@ export const CHAR_MAP: Record<BridgeCharId, { service: string; characteristic: s
   [BRIDGE_CHAR.prayerSettings]: { service: PRAYER_SERVICE_UUID, characteristic: PRAYER_SETTINGS_CHAR_UUID, withResponse: true },
   [BRIDGE_CHAR.beaconKey]: { service: BEACON_SERVICE_UUID, characteristic: BEACON_KEY_CHAR_UUID, withResponse: true },
   [BRIDGE_CHAR.beaconControl]: { service: BEACON_SERVICE_UUID, characteristic: BEACON_CONTROL_CHAR_UUID, withResponse: true },
+  [BRIDGE_CHAR.multiAlarm]: { service: MULTIALARM_SERVICE_UUID, characteristic: MULTIALARM_CHAR_UUID, withResponse: true },
 };
 
 export const ALL_SERVICE_UUIDS: string[] = [...new Set(Object.values(CHAR_MAP).map((c) => c.service))];
