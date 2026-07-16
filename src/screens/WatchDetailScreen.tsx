@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
-import { useWatchStore, withEvents } from '../storage/store';
+import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
-import { describeRule } from '../model/types';
 import { makeTransport } from '../ble/transportFactory';
-import { WatchResetError } from '../ble/syncManager';
-import { readBattery, sendMessageToWatch, setWatchTime, syncWatch } from '../ble/syncManager';
+import { readBattery, sendMessageToWatch, setWatchTime } from '../ble/syncManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
+
+// The four peer features, each with its own screen. Large, readable rows —
+// this is the watch's home hub.
+type FeatureKey = 'Schedule' | 'Alarms' | 'PrayerSettings' | 'Beacon';
+const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string }[] = [
+  { key: 'Schedule', icon: '🗓️', title: 'Schedule', subtitle: 'Recurring reminders' },
+  { key: 'Alarms', icon: '⏰', title: 'Alarms', subtitle: 'Up to 5 daily or one-shot' },
+  { key: 'PrayerSettings', icon: '🕌', title: 'Prayer times', subtitle: 'Five daily prayers' },
+  { key: 'Beacon', icon: '📍', title: 'Find My', subtitle: 'Turn into a locator beacon' },
+];
 
 export function WatchDetailScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
@@ -29,7 +37,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   const withTransport = async (label: string, fn: (deviceId: string) => Promise<void>) => {
     if (!watch.deviceId) {
-      showAlert('Not paired', 'Pair this watch first (Pair button above).');
+      showAlert('Not paired', 'Pair this watch first.');
       return;
     }
     setBusy(label);
@@ -41,50 +49,6 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       setBusy(null);
     }
   };
-
-  const applySync = (result: Awaited<ReturnType<typeof syncWatch>>) => {
-    upsertWatch({
-      ...watch,
-      events: result.events,
-      scheduleVersion: result.base.version,
-      syncedVersion: result.base.version,
-      syncBase: result.base,
-      capacity: result.capacity,
-      lastSyncAt: new Date().toISOString(),
-    });
-    if (result.notices.length > 0) {
-      showAlert(
-        'Merged changes from another device',
-        result.notices.map((n) => `• ${n.title}: ${n.detail}`).join('\n')
-      );
-    } else {
-      showAlert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.events.length} events on the watch.`);
-    }
-  };
-
-  const doSync = () =>
-    withTransport('Sync', async (deviceId) => {
-      try {
-        applySync(await syncWatch(makeTransport(deviceId), watch));
-      } catch (e) {
-        if (e instanceof WatchResetError) {
-          showAlert(
-            'Watch looks new or reset',
-            'Its schedule is empty but this phone has synced with it before. Restore this phone\u2019s schedule to the watch?',
-            [
-              { text: 'Start fresh (keep watch empty)', style: 'destructive',
-                onPress: () => void syncWatch(makeTransport(deviceId), { ...watch, events: [] }, true)
-                  .then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)) },
-              { text: 'Restore from this phone',
-                onPress: () => void syncWatch(makeTransport(deviceId), watch, true)
-                  .then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)) },
-            ]
-          );
-          return;
-        }
-        throw e;
-      }
-    });
 
   const doSetTime = () =>
     withTransport('Set time', async (deviceId) => {
@@ -100,7 +64,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   const doMessage = () => {
     if (!watch.deviceId) {
-      showAlert('Not paired', 'Pair this watch first (Pair button above).');
+      showAlert('Not paired', 'Pair this watch first.');
       return;
     }
     setComposeText('');
@@ -119,35 +83,17 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     });
   };
 
-  const deleteEvent = (eventId: number) => {
-    showAlert('Delete event?', 'It will be removed from the watch at the next sync.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => upsertWatch(withEvents(watch, watch.events.filter((e) => e.id !== eventId))),
-      },
-    ]);
-  };
+  const paired = !!watch.deviceId;
+  const lastSync = watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleDateString() : null;
 
-  const needsSync = watch.syncBase === undefined || watch.scheduleVersion !== watch.syncBase.version;
-  // 64 is the firmware's MaxEvents; the Digest overrides it after the first sync.
-  const capacity = watch.capacity ?? 64;
-  const atCapacity = watch.events.length >= capacity;
-
-  const addEvent = () => {
-    if (atCapacity) {
-      showAlert('Watch is full', `All ${capacity} event slots are used. Delete an event first (long-press one).`);
-      return;
-    }
-    navigation.navigate('EventEdit', { watchId: watch.id });
-  };
+  const featureSubtitle = (key: FeatureKey, fallback: string) =>
+    key === 'Schedule'
+      ? `${watch.events.length} event${watch.events.length === 1 ? '' : 's'}`
+      : fallback;
 
   return (
     <View style={styles.container}>
       <Modal visible={composeOpen} transparent animationType="fade" onRequestClose={() => setComposeOpen(false)}>
-        {/* paddingBottom shrinks the centering area to the space above the
-            keyboard so the auto-focused card stays fully visible. */}
         <View style={[styles.modalBackdrop, { paddingBottom: keyboardHeight }]}>
           <View style={styles.composeCard}>
             <Text style={styles.composeTitle}>Message to {watch.name}</Text>
@@ -178,114 +124,125 @@ export function WatchDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
-      <View style={styles.toolbar}>
-        <ToolbarButton
-          label={watch.deviceId ? 'Re-pair' : 'Pair'}
-          onPress={() => navigation.navigate('WatchPair', { watchId: watch.id })}
-        />
-        <ToolbarButton label="Set time" onPress={doSetTime} disabled={busy !== null} />
-        <ToolbarButton label="Battery" onPress={doBattery} disabled={busy !== null} />
-        <ToolbarButton label="Message" onPress={doMessage} disabled={busy !== null} />
-        <ToolbarButton label="Alarms" onPress={() => navigation.navigate('Alarms', { watchId: watch.id })} />
-        <ToolbarButton label="Prayer" onPress={() => navigation.navigate('PrayerSettings', { watchId: watch.id })} />
-        <ToolbarButton label="Find My" onPress={() => navigation.navigate('Beacon', { watchId: watch.id })} />
-      </View>
 
-      <FlatList
-        data={[...watch.events].sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))}
-        keyExtractor={(e) => String(e.id)}
-        contentContainerStyle={{ padding: spacing(2) }}
-        ListEmptyComponent={<Text style={styles.empty}>No events. Add the first one below.</Text>}
-        renderItem={({ item }) => (
+      <ScrollView contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+        {/* Status strip */}
+        <View style={styles.status}>
+          <View style={styles.statusLeft}>
+            <View style={[styles.dot, { backgroundColor: paired ? colors.accent : colors.textDim }]} />
+            <Text style={styles.statusText}>{paired ? 'Paired' : 'Not paired'}</Text>
+          </View>
+          <View style={styles.statusRight}>
+            {watch.batteryPercent !== undefined && <Text style={styles.statusMeta}>{watch.batteryPercent}%</Text>}
+            {lastSync && <Text style={styles.statusMeta}>synced {lastSync}</Text>}
+          </View>
+        </View>
+
+        {/* Feature peers */}
+        {FEATURES.map((f) => (
           <Pressable
-            style={styles.eventCard}
-            onPress={() => navigation.navigate('EventEdit', { watchId: watch.id, eventId: item.id })}
-            onLongPress={() => deleteEvent(item.id)}
-            testID={`event-${item.title}`}>
-            <Text style={styles.eventTime}>
-              {String(item.hour).padStart(2, '0')}:{String(item.minute).padStart(2, '0')}
-            </Text>
-            <View style={{ flex: 1, marginLeft: spacing(2) }}>
-              <Text style={[styles.eventTitle, !item.enabled && styles.disabled]}>{item.title}</Text>
-              <Text style={styles.eventRule}>{describeRule(item.rule)}</Text>
+            key={f.key}
+            style={styles.featureRow}
+            onPress={() => navigation.navigate(f.key, { watchId: watch.id })}
+            testID={`feature-${f.key}`}>
+            <Text style={styles.featureIcon}>{f.icon}</Text>
+            <View style={styles.featureBody}>
+              <Text style={styles.featureTitle}>{f.title}</Text>
+              <Text style={styles.featureSubtitle}>{featureSubtitle(f.key, f.subtitle)}</Text>
             </View>
+            <Text style={styles.chevron}>›</Text>
           </Pressable>
-        )}
-      />
+        ))}
 
-      <Text style={styles.slots} testID="slots-used">
-        {watch.events.length} of {capacity} slots used
-      </Text>
-      <View style={[styles.bottomRow, { paddingBottom: spacing(2) + insets.bottom }]}>
-        <Pressable
-          style={[styles.bigButton, { backgroundColor: colors.card }, atCapacity && { opacity: 0.5 }]}
-          onPress={addEvent}
-          testID="add-event">
-          <Text style={styles.bigButtonText}>+ Event</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.bigButton, { backgroundColor: needsSync ? colors.accent : colors.accentDim }]}
-          onPress={doSync}
-          disabled={busy !== null}
-          testID="sync-watch">
-          <Text style={styles.bigButtonText}>{busy ?? (needsSync ? 'Sync' : 'Synced ✓')}</Text>
-        </Pressable>
-      </View>
+        {/* Watch actions */}
+        <Text style={styles.sectionLabel}>Watch</Text>
+        <View style={styles.actions}>
+          <ActionButton
+            icon="🔗"
+            label={paired ? 'Re-pair' : 'Pair'}
+            onPress={() => navigation.navigate('WatchPair', { watchId: watch.id })}
+          />
+          <ActionButton icon="🕑" label={busy === 'Set time' ? '…' : 'Set time'} onPress={doSetTime} disabled={busy !== null} />
+          <ActionButton icon="🔋" label={busy === 'Battery' ? '…' : 'Battery'} onPress={doBattery} disabled={busy !== null} />
+          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={busy !== null} />
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
-function ToolbarButton({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+function ActionButton({ icon, label, onPress, disabled }: { icon: string; label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable style={[styles.toolbarButton, disabled && { opacity: 0.5 }]} onPress={onPress} disabled={disabled}>
-      <Text style={styles.toolbarButtonText}>{label}</Text>
+    <Pressable style={[styles.action, disabled && { opacity: 0.5 }]} onPress={onPress} disabled={disabled}>
+      <Text style={styles.actionIcon}>{icon}</Text>
+      <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1), padding: spacing(2), paddingBottom: 0 },
-  toolbarButton: {
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    paddingVertical: spacing(1),
-    paddingHorizontal: spacing(1.5),
-  },
-  toolbarButtonText: { color: colors.text, fontSize: 13 },
-  empty: { color: colors.textDim, textAlign: 'center', marginTop: spacing(6) },
-  eventCard: {
+
+  status: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing(2) },
+  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  statusText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  statusRight: { flexDirection: 'row', gap: spacing(1.5) },
+  statusMeta: { color: colors.textDim, fontSize: 13 },
+
+  featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: spacing(2),
+    borderRadius: 14,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(2),
     marginBottom: spacing(1.5),
   },
-  eventTime: { color: colors.accent, fontSize: 20, fontVariant: ['tabular-nums'], fontWeight: '700' },
-  eventTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  disabled: { textDecorationLine: 'line-through', color: colors.textDim },
-  eventRule: { color: colors.textDim, fontSize: 13, marginTop: 2 },
-  slots: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginTop: spacing(0.5) },
-  bottomRow: { flexDirection: 'row', gap: spacing(1.5), padding: spacing(2) },
-  bigButton: { flex: 1, borderRadius: 12, height: 52, alignItems: 'center', justifyContent: 'center' },
-  bigButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  modalBackdrop: { flex: 1, backgroundColor: '#000a', alignItems: 'center', justifyContent: 'center', padding: spacing(3) },
-  composeCard: { backgroundColor: colors.card, borderRadius: 16, padding: spacing(2.5), width: '100%' },
+  featureIcon: { fontSize: 28, width: 44, textAlign: 'center' },
+  featureBody: { flex: 1, marginLeft: spacing(1) },
+  featureTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  featureSubtitle: { color: colors.textDim, fontSize: 14, marginTop: 2 },
+  chevron: { color: colors.textDim, fontSize: 28, marginLeft: spacing(1) },
+
+  sectionLabel: {
+    color: colors.textDim,
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginTop: spacing(2),
+    marginBottom: spacing(1),
+  },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1) },
+  action: {
+    flexGrow: 1,
+    flexBasis: '22%',
+    minWidth: 74,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    paddingVertical: spacing(1.5),
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionIcon: { fontSize: 22 },
+  actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: spacing(2) },
+  composeCard: { backgroundColor: colors.card, borderRadius: 14, padding: spacing(2), width: '100%', maxWidth: 420 },
   composeTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: spacing(1.5) },
   composeInput: {
     backgroundColor: colors.background,
     color: colors.text,
     borderRadius: 10,
     padding: spacing(1.5),
-    minHeight: 80,
+    minHeight: 90,
     textAlignVertical: 'top',
     fontSize: 16,
   },
-  composeCount: { color: colors.textDim, fontSize: 12, textAlign: 'right', marginTop: 4 },
-  composeButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(1.5) },
-  composeCancel: { paddingVertical: spacing(1), paddingHorizontal: spacing(1.5) },
-  composeCancelText: { color: colors.textDim, fontSize: 15 },
+  composeCount: { color: colors.textDim, fontSize: 12, textAlign: 'right', marginTop: spacing(0.5) },
+  composeButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(1) },
+  composeCancel: { paddingVertical: spacing(1), paddingHorizontal: spacing(1) },
+  composeCancelText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
   composeSend: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing(1), paddingHorizontal: spacing(3) },
   composeSendText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

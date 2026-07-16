@@ -140,24 +140,28 @@ await waitFor(`[data-testid="watch-${WATCH_NAME}"]`);
 console.log('2. watch added');
 
 await click(`[data-testid="watch-${WATCH_NAME}"]`);
-await waitFor('[data-testid="sync-watch"]');
-console.log('3. watch detail open');
+await waitFor('[data-testid="feature-Schedule"]'); // the watch hub
+console.log('3. watch hub open');
 
-await clickText('/^(Re-)?pair$/i');
+await clickText('/^(Re-)?pair$/i'); // Pair action on the hub
 await waitFor('[data-testid="pair-simulator"]');
 await click('[data-testid="pair-simulator"]');
-await waitFor('[data-testid="sync-watch"]');
+await waitFor('[data-testid="feature-Schedule"]'); // back on the hub
 console.log('4. paired with simulator (ws proxy)');
 
-await click('[data-testid="sync-watch"]');
-await sleep(4000);
-const syncLabel = await evalJs(`document.querySelector('[data-testid="sync-watch"]').textContent`);
-console.log('5. sync:', JSON.stringify(syncLabel));
-
+// Watch actions live on the hub.
 await clickText('/^Set time$/');
 await sleep(2500);
 await clickText('/^Battery$/');
 await sleep(2500);
+
+// Schedule sync lives on its own screen now.
+await click('[data-testid="feature-Schedule"]');
+await waitFor('[data-testid="sync-watch"]');
+await click('[data-testid="sync-watch"]');
+await sleep(4000);
+const syncLabel = await evalJs(`document.querySelector('[data-testid="sync-watch"]').textContent`);
+console.log('5. sync:', JSON.stringify(syncLabel));
 
 const batteryPersisted = await evalJs(`(() => {
   const w = JSON.parse(localStorage.getItem('pinetime-companion/watches/v1') ?? '[]');
