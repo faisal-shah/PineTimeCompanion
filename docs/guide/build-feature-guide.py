@@ -25,10 +25,10 @@ def plain(name, cap=""):
 FLAG = [
     ("Schedule &amp; reminders", "Recurring reminders that live on the watch",
      ("watch-schedule.png", "On-watch schedule list"),
-     ("companion-schedule.png", "Companion → Schedule"),
-     ["Create recurring or one-off reminders in the app; they sync to the watch and fire on-wrist even when the phone is away.",
-      "Multi-phone-safe sync: edits from a second phone merge instead of clobbering.",
-      "The watch shows the upcoming items in a simple scrollable list."]),
+     ("companion-event-complex.png", "Companion → a complex recurring event"),
+     ["Build complex recurrences: every N days, weekly on chosen weekdays (e.g. Mon/Wed/Fri), or a day of the month — with a live preview of the next occurrences.",
+      "Reminders sync to the watch and fire on-wrist even when the phone is away; the watch shows them in a scrollable list.",
+      "Multi-phone-safe sync: edits from a second phone merge instead of clobbering."]),
     ("Alarms", "Up to five daily or one-shot alarms",
      ("watch-multialarm.png", "Multi-alarm app on the watch"),
      ("companion-alarms.png", "Companion → Alarms"),
@@ -36,17 +36,17 @@ FLAG = [
       "Changes sync both ways with conflict-safe versioning, so on-watch edits are preserved.",
       "A custom InfiniTime service replaces the stock single-alarm app."]),
     ("Prayer times", "Five daily prayers, computed on-device",
-     ("watch-face.png", "Times surface on the watch"),
+     ("watch-prayer.png", "Prayer-times app on the watch"),
      ("companion-prayer.png", "Companion → Prayer times"),
      ["Pick a calculation method (Muslim World League, ISNA, Egyptian, Umm al-Qura, Karachi…) and Asr madhab.",
-      "Set the location from the phone's GPS or enter coordinates; the watch computes the daily times itself.",
+      "Set the location from the phone's GPS or enter coordinates; the watch computes the five daily times itself and shows them in its own app.",
       "Optional vibration at each prayer time."]),
     ("Find My (locator beacon)", "Turn the watch into an Apple Find My tag",
      ("watch-findmy.png", "Find My toggle on the watch"),
-     ("companion-findmy.png", "Companion → Find My"),
-     ["Generate a key pair in the app and provision it to the watch; nearby iPhones then report its location to Apple's Find My network.",
-      "Turn beaconing on from the watch (Settings → Find My). It needs Bluetooth on and defaults OFF at every boot for privacy.",
-      "Export the keys to look the watch up in your own macless-haystack server."]),
+     ("companion-findmy-map.png", "Companion → location history on a map"),
+     ["Generate a key pair, provision it to the watch, and turn beaconing on (Settings → Find My); nearby iPhones then report its location to Apple's Find My network.",
+      "The app pulls the crowd-sourced fixes and plots the watch's location — with its recent trail and accuracy — on a live map.",
+      "Export the keys to also look the watch up in your own macless-haystack server."]),
     ("Firmware &amp; resources update (OTA)", "Update InfiniTime straight from the app",
      ("watch-ota.png", "“Firmware &amp; files” must be enabled"),
      ("companion-update.png", "Companion → Update watch"),
@@ -138,6 +138,22 @@ parts.append(f"""
     <b>Where it works.</b> Firmware DFU runs on <b>Android</b> and against the simulator; a plain web browser can&rsquo;t reach the DFU service (it&rsquo;s on Chromium&rsquo;s Bluetooth blocklist), so the app hides firmware there. Resource uploads work everywhere. Both require <b>&ldquo;Firmware &amp; files&rdquo;</b> enabled on the watch.
   </div>
 </section>""")
+
+# NOTIFICATIONS
+parts.append(f"""
+<section class="page">
+  <div class="section-tag">Notifications &amp; alerts</div>
+  <h2>Notifications that don&rsquo;t get lost</h2>
+  <p class="lead">Two kinds reach the watch: phone notifications forwarded from your phone, and watch-originated alerts (alarm, reminder, prayer) that fire on-wrist.</p>
+  <div class="row center gap">
+    {watch("watch-notification.png", "A forwarded phone notification")}
+    {watch("watch-pendingalerts.png", "The pending-alerts queue (1 of 2)")}
+  </div>
+  <div class="note">
+    <b>The pending-alerts queue.</b> Every watch-originated alert &mdash; a multi-alarm going off, a schedule reminder, a prayer-time alert &mdash; lands in one shared queue instead of each app owning a screen that the next alert would trample. Miss one while another is ringing and it still waits for you: the queue holds the most recent alerts (newest first), shows a <b>1 / N</b> counter so you can page through them, and you clear each with <b>OK</b>. Phone notifications (messages, calls) stack separately in the swipe-down notifications list.
+  </div>
+</section>
+""")
 
 # BUILT-IN APPS
 app_cells = "".join(
