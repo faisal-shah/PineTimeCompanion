@@ -220,6 +220,42 @@ reboot → BootReceiver → auto-reconnect; the on-device Notification-Access gr
 flow; and the live `onNotificationPosted` push (proven with real notifications on
 the emulator; flaky only for `cmd notification post` on the preview API image).
 
+## Weather
+
+The **Weather** hub feature pushes current conditions + a 5-day forecast to the
+watch's SimpleWeatherService (`00050001`), so the Weather app and watch-face
+weather widget show real data instead of `---`. No firmware change — the service
+already exists; the companion drives it.
+
+- Data from **Open-Meteo** (no API key, HTTPS — matches the OpenFreeMap ethos).
+  `weatherProtocol.ts` encodes the two write messages (current, 53 B; forecast,
+  ≤36 B) in centidegrees Celsius with a WMO→icon mapping; the *watch* converts to
+  °F per its own setting.
+- Location comes from the watch's prayer-times coordinates when set, else the
+  phone's GPS.
+- The watch drops weather after 24h, so the app pushes fresh weather each time you
+  open the Weather screen and best-effort after a schedule sync (keeping the watch
+  face current). `scripts/weather-e2e.mjs` pushes to a live InfiniSim and the
+  watch face renders the pushed temperature + icon.
+
+## Step tracking
+
+The **Steps** hub feature reads today's cumulative step count from the watch's
+MotionService (`00030001`) and keeps the durable **daily history on the phone** —
+the watch itself only remembers today + yesterday (RAM-only). It reads + records
+on each screen open, keeping the max seen per date (the day's final total).
+
+- `stepsStore.ts` mirrors the location-history store (per-watch, 60-day cap).
+- The screen shows today vs the 10 000-step goal and a 14-day bar chart drawn with
+  plain RN Views — no charting dependency, so it renders on web/desktop too; a
+  single accent hue, today highlighted, a dashed goal line, tap-a-bar for the
+  count. `scripts/steps-e2e.mjs` bumps the sim counter (`simctl.py key steps-up`)
+  and asserts the read-back.
+
+Both features needed a small InfiniSim bridge char each (weather write, steps
+read) but **no InfiniTime firmware change**. Hardware-deferred: real BMA421 step
+counts and the live step-notify cadence over BLE; real GPS→weather accuracy.
+
 ## Releases
 
 `gh release create vX.Y.Z` (or publish one in the UI) triggers
