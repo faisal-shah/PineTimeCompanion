@@ -180,6 +180,46 @@ on-watch Validate/rollback, real-radio 20-byte/PRN timing over BLE, the
 235-byte FS chunk over a negotiated MTU, and the native-only DFU gating (that
 real Web Bluetooth genuinely can't reach `0x1530`).
 
+## Notification forwarding (Android)
+
+The **Notifications** hub feature forwards your phone's notifications to the
+watch, Gadgetbridge-style, **per watch** — one watch (yours) mirrors your alerts;
+the kids' watches stay on parent-composed messages only.
+
+It's Android-only and **fully native** (`modules/notification-forwarder/`, a
+local Expo Module in Kotlin): a `NotificationListenerService` captures posts and
+a `connectedDevice` foreground service holds a persistent `BluetoothGatt` link
+to each forwarding-enabled watch, so it keeps working with the RN app swiped
+away. JS only pushes config (per-watch on/off + a global app allowlist + a calls
+switch) and reads status; the forwarding runs entirely in the services.
+
+- Notifications write the InfiniTime ANS New Alert char (`0x2A46`, category
+  `0xFA` = plain alert); incoming calls use category `0x03` so the watch rings
+  and shows the caller with accept/reject/mute (v1: those buttons act on the
+  watch only — phone-side call control is a later phase, but the button events
+  already flow back over BLE). Filtering drops own/summary/ongoing notifications,
+  dedupes, and rate-limits (the watch only holds 5).
+- Needs the user to grant **Notification Access** (the screen deep-links to the
+  system setting) and per-app allowlisting (default: forward nothing).
+- Because it's a local module under `modules/`, CI's `expo prebuild` autolinks it
+  with no config-plugin or `android/` edits; web/desktop exclude it via a
+  `.web.ts` no-op. During DFU/resource uploads the app pauses this watch's
+  forwarding link so the long BLE op has exclusive access.
+
+Verified headlessly on the `tb_emu` emulator against InfiniSim: a real Android
+notification captured by the listener passes the filter (ongoing ones dropped),
+encodes, and renders on the sim watch; an incoming call renders the ring screen.
+`scripts/notify-e2e.mjs` (`npm run notify:e2e`) drives config + inject over adb
+and asserts the native forward + sim render. 19 Kotlin JUnit tests cover the
+codec (byte-matches the TS encoder), filter, framing, and backoff.
+
+Hardware-deferred (real PineTime + phone): the persistent GATT reconnect walking
+in/out of range; overnight battery on both ends; Doze / OEM battery-killer
+survival (connectedDevice FGS + reconnect-on-screen-on is the mitigation);
+reboot → BootReceiver → auto-reconnect; the on-device Notification-Access grant
+flow; and the live `onNotificationPosted` push (proven with real notifications on
+the emulator; flaky only for `cmd notification post` on the preview API image).
+
 ## Releases
 
 `gh release create vX.Y.Z` (or publish one in the UI) triggers

@@ -56,7 +56,8 @@
     "desktop:dev": "npm --prefix desktop run dev",
     "desktop:build:linux": "expo export --platform web --output-dir desktop/dist && npm --prefix desktop install && npm --prefix desktop exec electron-builder -- --linux AppImage",
     "desktop:export": "expo export --platform web --output-dir desktop/dist",
-    "desktop:e2e": "node scripts/desktop-e2e.mjs"
+    "desktop:e2e": "node scripts/desktop-e2e.mjs",
+    "notify:e2e": "node scripts/notify-e2e.mjs"
   },
   "private": true
 }
