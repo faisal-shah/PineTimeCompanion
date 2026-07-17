@@ -42,3 +42,6 @@ yarn-error.*
 dist-web/
 desktop/dist/
 desktop/release/
+
+# Local module Gradle build outputs
+modules/**/build/

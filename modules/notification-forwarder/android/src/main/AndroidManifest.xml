@@ -44,5 +44,18 @@
         <action android:name="android.intent.action.BOOT_COMPLETED" />
       </intent-filter>
     </receiver>
+
+    <!-- Debug-only adb lever for the headless e2e. The receiver itself is inert
+         in release builds (guarded on FLAG_DEBUGGABLE), so exporting it here is
+         a dev-only convenience, not a release surface. -->
+    <receiver
+      android:name=".DebugConfigReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.SET_CONFIG" />
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.INJECT_CALL" />
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.INJECT_NOTIF" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>
