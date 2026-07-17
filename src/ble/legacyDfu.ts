@@ -14,6 +14,7 @@
 //   on the watch or the next reboot rolls back. No BLE opcode confirms it.
 
 import { BRIDGE_CHAR, TransportError, WatchTransport } from './transport';
+import { NotificationInbox } from './notificationInbox';
 import { DfuArchive } from './dfuZip';
 
 const PRN_INTERVAL = 10;
@@ -47,42 +48,6 @@ export interface DfuProgress {
 
 export class DfuAbortedError extends Error {}
 
-// A queue of control-point notifications with predicate-based waiting.
-class NotificationInbox {
-  private queue: Uint8Array[] = [];
-  private waiter?: { match: (n: Uint8Array) => boolean; resolve: (n: Uint8Array) => void };
-
-  push(n: Uint8Array): void {
-    if (this.waiter && this.waiter.match(n)) {
-      const w = this.waiter;
-      this.waiter = undefined;
-      w.resolve(n);
-      return;
-    }
-    this.queue.push(n);
-  }
-
-  wait(match: (n: Uint8Array) => boolean, timeoutMs = NOTIFY_TIMEOUT_MS): Promise<Uint8Array> {
-    const idx = this.queue.findIndex(match);
-    if (idx >= 0) {
-      return Promise.resolve(this.queue.splice(idx, 1)[0]);
-    }
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.waiter = undefined;
-        reject(new TransportError('timed out waiting for a DFU notification'));
-      }, timeoutMs);
-      this.waiter = {
-        match,
-        resolve: (n) => {
-          clearTimeout(timer);
-          resolve(n);
-        },
-      };
-    });
-  }
-}
-
 const isResponse = (op: number, err: number) => (n: Uint8Array) => n[0] === RSP && n[1] === op && n[2] === err;
 
 /**
@@ -97,7 +62,7 @@ export async function runDfu(
 ): Promise<void> {
   const { binFile, datFile } = archive;
   const total = binFile.length;
-  const inbox = new NotificationInbox();
+  const inbox = new NotificationInbox(NOTIFY_TIMEOUT_MS);
   const unsubscribe = await transport.subscribe(BRIDGE_CHAR.dfuControl, (n) => inbox.push(n));
 
   const ctrl = (bytes: number[]) => transport.write(BRIDGE_CHAR.dfuControl, new Uint8Array(bytes));
