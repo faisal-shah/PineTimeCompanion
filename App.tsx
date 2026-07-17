@@ -11,6 +11,7 @@ import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
+import { UpdateScreen } from './src/screens/UpdateScreen';
 import { AppleLoginScreen } from './src/screens/AppleLoginScreen';
 import { FindMyMapScreen } from './src/screens/FindMyMapScreen';
 import { FindMySettingsScreen } from './src/screens/FindMySettingsScreen';
@@ -39,6 +40,7 @@ export default function App() {
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
           <Stack.Screen name="Alarms" component={AlarmsScreen} options={{ title: 'Alarms' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
+          <Stack.Screen name="Update" component={UpdateScreen} options={{ title: 'Update watch' }} />
           <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
           <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />
           <Stack.Screen name="FindMySettings" component={FindMySettingsScreen} options={{ title: 'Find My settings' }} />

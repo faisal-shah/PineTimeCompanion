@@ -15,12 +15,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
 
 // The four peer features, each with its own screen. Large, readable rows —
 // this is the watch's home hub.
-type FeatureKey = 'Schedule' | 'Alarms' | 'PrayerSettings' | 'Beacon';
+type FeatureKey = 'Schedule' | 'Alarms' | 'PrayerSettings' | 'Beacon' | 'Update';
 const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string }[] = [
   { key: 'Schedule', icon: '🗓️', title: 'Schedule', subtitle: 'Recurring reminders' },
   { key: 'Alarms', icon: '⏰', title: 'Alarms', subtitle: 'Up to 5 daily or one-shot' },
   { key: 'PrayerSettings', icon: '🕌', title: 'Prayer times', subtitle: 'Five daily prayers' },
   { key: 'Beacon', icon: '📍', title: 'Find My', subtitle: 'Turn into a locator beacon' },
+  { key: 'Update', icon: '⬆️', title: 'Update watch', subtitle: 'Firmware & resources' },
 ];
 
 export function WatchDetailScreen({ navigation, route }: Props) {

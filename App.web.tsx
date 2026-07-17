@@ -17,6 +17,7 @@ import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
+import { UpdateScreen } from './src/screens/UpdateScreen';
 import { WatchStoreContext } from './src/storage/store';
 import { navTheme, stackScreenOptions, useAppBootstrap } from './src/app/useAppBootstrap';
 import { DesktopBlePicker } from './src/ui/DesktopBlePicker.web';
@@ -44,6 +45,7 @@ export default function App() {
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
           <Stack.Screen name="Alarms" component={AlarmsScreen} options={{ title: 'Alarms' }} />
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
+          <Stack.Screen name="Update" component={UpdateScreen} options={{ title: 'Update watch' }} />
         </Stack.Navigator>
         {/* Electron-only Bluetooth overlays; self-disable in plain browsers. */}
         <DesktopBlePicker />
