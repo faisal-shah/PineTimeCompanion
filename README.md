@@ -137,10 +137,7 @@ simulator.
 
 Pair via "Scan for real watches" (needs Bluetooth permissions; the watch advertises
 as InfiniTime). The BLE path (`bleTransport.ts`) is deliberately logic-free and is
-the only code that can't run in the emulator. Firmware updates (Nordic Legacy DFU)
-are not in the app yet — use nRF Connect per watch until hardware is available to
-integrate and verify `react-native-nordic-dfu` (settings: `disableMtuRequest`,
-`keepBond`; the release zip carries manifest + bin + dat).
+the only code that can't run in the emulator.
 
 On web/desktop the same button opens the Bluetooth chooser
 (`pairScan.web.ts` → `requestDevice`); in Electron the app's own picker
@@ -148,6 +145,40 @@ overlay appears, and on Windows/Linux a passkey prompt handles InfiniTime's
 6-digit pairing (macOS pairing is OS-handled). Hardware-untested until a
 watch exists: the Web Bluetooth GATT path itself, the passkey flow, and the
 512-byte long-write assumption (`webBluetoothTransport.requestMtu`).
+
+## Updating a watch (OTA)
+
+The **Update** hub feature flashes InfiniTime firmware and pushes the matching
+external resources — no nRF Connect needed. It lists releases from a configurable
+GitHub repo (default `faisal-shah/InfiniTime`, editable in the screen) and reads
+the watch's installed version from the Device Information Service.
+
+Two independent BLE operations make up a full update:
+
+- **Firmware** — Nordic Legacy DFU (`legacyDfu.ts`) over MCUBoot: the 9-step
+  handshake streaming the image in **mandatory 20-byte** packets. The watch
+  boots the new image **unvalidated**, so the screen shows a card telling the
+  user to tap **Settings ▸ Firmware ▸ Validate** on the watch (skipping it rolls
+  back on the next reboot), then re-reads the revision to confirm. A CRC failure
+  is surfaced by timeout — the firmware sends no notification on a bad image
+  (`Reset()` stops the notify timer). Firmware DFU is **native/sim only**: the
+  `0x1530` service is on Chromium's Web Bluetooth blocklist, so the screen hides
+  it in real browsers and points the user at the Android app.
+- **Resources** — the Adafruit BLE filesystem (`fsClient.ts`, FSService
+  `0xFEBB`): mkdir the parent dirs, write each file in 235-byte lockstep chunks,
+  delete obsolete files. Works on every platform.
+
+Both need **Settings ▸ "Firmware & files"** enabled on the watch (the disabled
+state returns insufficient-authorization, which the app translates into a plain
+"turn it on" message). The whole flow is exercised headlessly against InfiniSim:
+`scripts/dfu-e2e.mjs` (real DFU zip, CRC-validate + corrupt-reject),
+`scripts/resources-e2e.mjs` (real resources zip, LISTDIR-verified), and
+`scripts/update-e2e.mjs` (the browser Update screen end to end).
+
+Hardware-untested until a watch exists: the real reboot → MCUBoot swap →
+on-watch Validate/rollback, real-radio 20-byte/PRN timing over BLE, the
+235-byte FS chunk over a negotiated MTU, and the native-only DFU gating (that
+real Web Bluetooth genuinely can't reach `0x1530`).
 
 ## Releases
 
