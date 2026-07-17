@@ -94,6 +94,8 @@ export interface Watch {
   prayerSettings?: PrayerSettings;
   /** FindMy beacon key; absent until generated */
   beacon?: BeaconConfig;
+  /** Forward phone notifications to this watch (Android only, persistent link). */
+  forwardNotifications?: boolean;
   events: WatchEvent[];
 }
 

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DarkTheme } from '@react-navigation/native';
 import { loadWatches, saveWatches, WatchStore } from '../storage/store';
 import { migrateSecrets } from '../secure/secrets';
+import { syncForwarderConfig } from '../notifications/forwarder';
 import { Watch } from '../model/types';
 import { colors } from '../ui/theme';
 
@@ -43,6 +44,10 @@ export function useAppBootstrap(): { loaded: boolean; store: WatchStore } {
   useEffect(() => {
     if (loaded) {
       saveWatches(watches).catch(() => undefined);
+      // Keep the native forwarding service's config in step with the watch list
+      // (per-watch forwardNotifications flag). No-op on web. The NotificationsScreen
+      // calls this too when the global allowlist / calls switch change.
+      syncForwarderConfig(watches).catch(() => undefined);
     }
   }, [watches, loaded]);
 

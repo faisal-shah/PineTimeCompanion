@@ -4,11 +4,10 @@
 // to them (InfiniTime ANS). JS only pushes config and reads status — all the
 // forwarding runs natively so it survives the RN app being swiped away.
 //
-// On web/desktop this file is shadowed by index.web.ts (no-op). The TS wrapper
-// in src/notifications/forwarder.ts guards the requireNativeModule call so a
-// build without the module linked (e.g. iOS) fails soft.
+// App code imports the typed default export through src/notifications/forwarder.ts
+// (which is shadowed by a no-op on web).
 
-import { requireNativeModule, EventEmitter, type EventSubscription } from 'expo-modules-core';
+import { NativeModule, requireNativeModule } from 'expo-modules-core';
 
 export interface EnabledWatch {
   deviceId: string; // BLE MAC, or "host:port" for the InfiniSim bridge
@@ -38,56 +37,21 @@ export interface ForwarderStatus {
   connections: ConnectionStatus[];
 }
 
-const Native = requireNativeModule('NotificationForwarder');
-const emitter = new EventEmitter(Native);
+export type ForwarderEvents = {
+  onConnectionState: (event: { deviceId: string; state: ConnState }) => void;
+  onCallEvent: (event: { deviceId: string; event: number }) => void;
+};
 
-/** Push the desired forwarding config; starts/stops the native service. */
-export function setConfig(config: ForwarderConfig): Promise<void> {
-  return Native.setConfig(config);
+declare class NotificationForwarderModule extends NativeModule<ForwarderEvents> {
+  ping(): string;
+  setConfig(config: ForwarderConfig): Promise<void>;
+  getConfig(): Promise<ForwarderConfig>;
+  isNotificationAccessGranted(): Promise<boolean>;
+  openNotificationAccessSettings(): void;
+  getInstalledApps(): Promise<InstalledApp[]>;
+  getStatus(): Promise<ForwarderStatus>;
+  pauseConnections(deviceId: string): Promise<void>;
+  resumeConnections(deviceId: string): Promise<void>;
 }
 
-export function getConfig(): Promise<ForwarderConfig> {
-  return Native.getConfig();
-}
-
-/** Whether the user has granted this app Notification Access. */
-export function isNotificationAccessGranted(): Promise<boolean> {
-  return Native.isNotificationAccessGranted();
-}
-
-/** Opens the system Notification Access settings screen. */
-export function openNotificationAccessSettings(): void {
-  Native.openNotificationAccessSettings();
-}
-
-/** Launchable apps on the device, for the allowlist picker. */
-export function getInstalledApps(): Promise<InstalledApp[]> {
-  return Native.getInstalledApps();
-}
-
-export function getStatus(): Promise<ForwarderStatus> {
-  return Native.getStatus();
-}
-
-/** Release a watch's forwarding link so a JS-driven BLE op (sync/DFU) can own it. */
-export function pauseConnections(deviceId: string): Promise<void> {
-  return Native.pauseConnections(deviceId);
-}
-
-export function resumeConnections(deviceId: string): Promise<void> {
-  return Native.resumeConnections(deviceId);
-}
-
-export function onConnectionState(
-  listener: (e: { deviceId: string; state: ConnState }) => void,
-): EventSubscription {
-  return emitter.addListener('onConnectionState', listener);
-}
-
-export function onCallEvent(
-  listener: (e: { deviceId: string; event: number }) => void,
-): EventSubscription {
-  return emitter.addListener('onCallEvent', listener);
-}
-
-export default Native;
+export default requireNativeModule<NotificationForwarderModule>('NotificationForwarder');

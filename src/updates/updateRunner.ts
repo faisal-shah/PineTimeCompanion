@@ -9,6 +9,7 @@ import { runDfu, DfuProgress } from '../ble/legacyDfu';
 import { parseDfuArchive } from '../ble/dfuZip';
 import { uploadResources, ResourcesProgress } from '../ble/resourcesUpload';
 import { parseResourcesArchive } from '../ble/resourcesZip';
+import { pauseConnections, resumeConnections } from '../notifications/forwarder';
 
 // The watch refused DFU/FS access: "Firmware & files" is Disabled in its
 // settings (BLE_ATT_ERR_INSUFFICIENT_AUTHOR / status 8).
@@ -47,6 +48,8 @@ export async function runFirmwareUpdate(
   onProgress?: (p: DfuProgress) => void,
 ): Promise<void> {
   const archive = parseDfuArchive(dfuZip);
+  // DFU needs exclusive access; release any forwarding link to this watch first.
+  await pauseConnections(deviceId).catch(() => undefined);
   await transport.connect(deviceId);
   try {
     await runDfu(transport, archive, onProgress);
@@ -54,6 +57,7 @@ export async function runFirmwareUpdate(
     throw isAuthError(e) ? new DfuDisabledError() : e;
   } finally {
     await transport.disconnect().catch(() => undefined);
+    await resumeConnections(deviceId).catch(() => undefined);
   }
 }
 
@@ -65,6 +69,7 @@ export async function runResourcesUpdate(
   onProgress?: (p: ResourcesProgress) => void,
 ): Promise<void> {
   const archive = parseResourcesArchive(resourcesZip);
+  await pauseConnections(deviceId).catch(() => undefined);
   await transport.connect(deviceId);
   try {
     // A larger MTU lets the 235-byte FS chunks go out in one write on real
@@ -75,5 +80,6 @@ export async function runResourcesUpdate(
     throw isAuthError(e) ? new DfuDisabledError() : e;
   } finally {
     await transport.disconnect().catch(() => undefined);
+    await resumeConnections(deviceId).catch(() => undefined);
   }
 }

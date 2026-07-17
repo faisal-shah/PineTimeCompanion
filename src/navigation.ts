@@ -7,6 +7,7 @@ export type RootStackParamList = {
   PrayerSettings: { watchId: string };
   Alarms: { watchId: string };
   Beacon: { watchId: string };
+  Notifications: { watchId: string };
   Update: { watchId: string };
   AppleLogin: undefined;
   FindMyMap: { watchId: string };
