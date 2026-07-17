@@ -1,0 +1,93 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="dev.faisal.pinetimecompanion.notifyfwd" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6
+7    <!-- Write to the watch's ANS characteristic over BLE. -->
+8    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+8-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:4:3-74
+8-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:4:20-71
+9    <!-- The foreground service that holds the persistent watch connection(s). -->
+10    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+10-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:6:3-75
+10-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:6:20-72
+11    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+11-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:7:3-92
+11-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:7:20-89
+12    <!-- Its ongoing status notification (Android 13+). -->
+13    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+13-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:9:3-75
+13-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:9:20-72
+14    <!-- Re-arm forwarding after a reboot. -->
+15    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+15-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:11:3-79
+15-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:11:20-76
+16
+17    <!--
+18       Android 11+ package visibility, so the app-allowlist picker can list
+19       launchable apps.
+20    -->
+21    <queries>
+21-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:15:3-20:13
+22        <intent>
+22-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:16:5-19:14
+23            <action android:name="android.intent.action.MAIN" />
+23-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:17:7-59
+23-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:17:15-56
+24
+25            <category android:name="android.intent.category.LAUNCHER" />
+25-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:18:7-67
+25-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:18:17-64
+26        </intent>
+27    </queries>
+28
+29    <application>
+29-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:22:3-47:17
+30
+31        <!--
+32         Captures posted phone notifications once the user grants Notification
+33         Access. Bound by the system, not started by us.
+34        -->
+35        <service
+35-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:25:5-32:15
+36            android:name="dev.faisal.pinetimecompanion.notifyfwd.NotifListenerService"
+36-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:26:7-43
+37            android:exported="false"
+37-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:27:7-31
+38            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+38-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:28:7-81
+39            <intent-filter>
+39-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:29:7-31:23
+40                <action android:name="android.service.notification.NotificationListenerService" />
+40-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:30:9-91
+40-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:30:17-88
+41            </intent-filter>
+42        </service>
+43
+44        <!-- Keeps the process + BLE links alive while any watch has forwarding on. -->
+45        <service
+45-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:35:5-38:57
+46            android:name="dev.faisal.pinetimecompanion.notifyfwd.ForwarderService"
+46-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:36:7-39
+47            android:exported="false"
+47-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:37:7-31
+48            android:foregroundServiceType="connectedDevice" />
+48-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:38:7-54
+49
+50        <receiver
+50-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:40:5-46:16
+51            android:name="dev.faisal.pinetimecompanion.notifyfwd.BootReceiver"
+51-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:41:7-35
+52            android:exported="false" >
+52-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:42:7-31
+53            <intent-filter>
+53-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:43:7-45:23
+54                <action android:name="android.intent.action.BOOT_COMPLETED" />
+54-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:44:9-71
+54-->/home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:44:17-68
+55            </intent-filter>
+56        </receiver>
+57    </application>
+58
+59</manifest>

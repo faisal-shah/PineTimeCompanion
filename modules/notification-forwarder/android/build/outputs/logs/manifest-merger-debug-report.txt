@@ -1,0 +1,84 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:1:1-48:12
+INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:1:1-48:12
+	package
+		INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:1:11-69
+uses-permission#android.permission.BLUETOOTH_CONNECT
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:4:3-74
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:4:20-71
+uses-permission#android.permission.FOREGROUND_SERVICE
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:6:3-75
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:6:20-72
+uses-permission#android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:7:3-92
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:7:20-89
+uses-permission#android.permission.POST_NOTIFICATIONS
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:9:3-75
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:9:20-72
+uses-permission#android.permission.RECEIVE_BOOT_COMPLETED
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:11:3-79
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:11:20-76
+queries
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:15:3-20:13
+intent#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:16:5-19:14
+action#android.intent.action.MAIN
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:17:7-59
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:17:15-56
+category#android.intent.category.LAUNCHER
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:18:7-67
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:18:17-64
+application
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:22:3-47:17
+service#dev.faisal.pinetimecompanion.notifyfwd.NotifListenerService
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:25:5-32:15
+	android:exported
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:27:7-31
+	android:permission
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:28:7-81
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:26:7-43
+intent-filter#action:name:android.service.notification.NotificationListenerService
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:29:7-31:23
+action#android.service.notification.NotificationListenerService
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:30:9-91
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:30:17-88
+service#dev.faisal.pinetimecompanion.notifyfwd.ForwarderService
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:35:5-38:57
+	android:exported
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:37:7-31
+	android:foregroundServiceType
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:38:7-54
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:36:7-39
+receiver#dev.faisal.pinetimecompanion.notifyfwd.BootReceiver
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:40:5-46:16
+	android:exported
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:42:7-31
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:41:7-35
+intent-filter#action:name:android.intent.action.BOOT_COMPLETED
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:43:7-45:23
+action#android.intent.action.BOOT_COMPLETED
+ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:44:9-71
+	android:name
+		ADDED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml:44:17-68
+uses-sdk
+INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml
+INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/faisal/repos/faisal-shah/PineTimeCompanion/modules/notification-forwarder/android/src/main/AndroidManifest.xml
