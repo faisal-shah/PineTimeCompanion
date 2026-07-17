@@ -3,6 +3,8 @@
 
 import { SyncBase, Watch, WatchEvent } from '../model/types';
 import { decodePrayerSettings, encodePrayerSettings, WireSettings } from './prayerProtocol';
+import { CurrentWeather, encodeCurrentWeather, encodeForecast, ForecastDay } from './weatherProtocol';
+import { decodeStepCount } from './stepsProtocol';
 import { BEACON_CONTROL_ENABLE } from './beaconProtocol';
 import { MergeNotice, looksLikeWatchReset, mergeSchedules } from '../model/merge';
 import {
@@ -191,6 +193,36 @@ export async function readBattery(transport: WatchTransport, deviceId: string): 
       throw new TransportError('empty battery read');
     }
     return payload[0];
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/**
+ * Push current weather + a 5-day forecast to the watch (SimpleWeatherService,
+ * two write messages on one write-only char). The watch drops weather older
+ * than 24h, so call this on each connect.
+ */
+export async function writeWeather(
+  transport: WatchTransport,
+  deviceId: string,
+  current: CurrentWeather,
+  forecast: ForecastDay[],
+): Promise<void> {
+  await transport.connect(deviceId);
+  try {
+    await transport.write(BRIDGE_CHAR.weather, encodeCurrentWeather(current));
+    await transport.write(BRIDGE_CHAR.weather, encodeForecast(current.timestamp, forecast));
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/** Read the watch's cumulative step count for today (MotionService, uint32 LE). */
+export async function readSteps(transport: WatchTransport, deviceId: string): Promise<number> {
+  await transport.connect(deviceId);
+  try {
+    return decodeStepCount(await transport.read(BRIDGE_CHAR.steps));
   } finally {
     await transport.disconnect().catch(() => undefined);
   }

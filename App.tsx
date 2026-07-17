@@ -13,6 +13,7 @@ import { AlarmsScreen } from './src/screens/AlarmsScreen';
 import { BeaconScreen } from './src/screens/BeaconScreen';
 import { UpdateScreen } from './src/screens/UpdateScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { WeatherScreen } from './src/screens/WeatherScreen';
 import { AppleLoginScreen } from './src/screens/AppleLoginScreen';
 import { FindMyMapScreen } from './src/screens/FindMyMapScreen';
 import { FindMySettingsScreen } from './src/screens/FindMySettingsScreen';
@@ -43,6 +44,7 @@ export default function App() {
           <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
           <Stack.Screen name="Update" component={UpdateScreen} options={{ title: 'Update watch' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+          <Stack.Screen name="Weather" component={WeatherScreen} options={{ title: 'Weather' }} />
           <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
           <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />
           <Stack.Screen name="FindMySettings" component={FindMySettingsScreen} options={{ title: 'Find My settings' }} />

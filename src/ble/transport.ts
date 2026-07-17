@@ -21,6 +21,8 @@ export const BRIDGE_CHAR = {
   dfuPacket: 11, // 0x1532 write-without-response
   fsTransfer: 12, // adaf0200 write + notify
   firmwareRevision: 13, // 0x2A26 read
+  weather: 14, // 00050001 write (SimpleWeatherService: current + forecast)
+  steps: 15, // 00030001 read (MotionService: today's cumulative step count)
 } as const;
 
 export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];

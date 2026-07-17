@@ -9,6 +9,8 @@ import { SCHEDULE_SERVICE_UUID, SYNC_COMMAND_CHAR_UUID, DIGEST_CHAR_UUID, EVENT_
 import { PRAYER_SERVICE_UUID, PRAYER_SETTINGS_CHAR_UUID } from './prayerProtocol';
 import { BEACON_SERVICE_UUID, BEACON_KEY_CHAR_UUID, BEACON_CONTROL_CHAR_UUID } from './beaconProtocol';
 import { MULTIALARM_SERVICE_UUID, MULTIALARM_CHAR_UUID } from './multiAlarmProtocol';
+import { WEATHER_SERVICE_UUID, WEATHER_CHAR_UUID } from './weatherProtocol';
+import { MOTION_SERVICE_UUID, STEP_COUNT_CHAR_UUID } from './stepsProtocol';
 
 // Standard GATT services the companion basics use.
 const CTS_SERVICE = '00001805-0000-1000-8000-00805f9b34fb';
@@ -44,6 +46,8 @@ export const CHAR_MAP: Record<BridgeCharId, { service: string; characteristic: s
   [BRIDGE_CHAR.dfuPacket]: { service: DFU_SERVICE, characteristic: DFU_PACKET, withResponse: false },
   [BRIDGE_CHAR.fsTransfer]: { service: FS_SERVICE, characteristic: FS_TRANSFER, withResponse: true },
   [BRIDGE_CHAR.firmwareRevision]: { service: DIS_SERVICE, characteristic: DIS_FIRMWARE_REVISION, withResponse: true },
+  [BRIDGE_CHAR.weather]: { service: WEATHER_SERVICE_UUID, characteristic: WEATHER_CHAR_UUID, withResponse: true },
+  [BRIDGE_CHAR.steps]: { service: MOTION_SERVICE_UUID, characteristic: STEP_COUNT_CHAR_UUID, withResponse: true },
 };
 
 // The DFU service is on the Web Bluetooth GATT blocklist; requesting it in

@@ -9,6 +9,7 @@ import { showAlert } from '../ui/alert';
 import { describeRule } from '../model/types';
 import { makeTransport } from '../ble/transportFactory';
 import { WatchResetError, syncWatch } from '../ble/syncManager';
+import { pushWeather } from '../weather/pushWeather';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Schedule'>;
 
@@ -48,6 +49,8 @@ export function ScheduleScreen({ navigation, route }: Props) {
     setBusy(true);
     try {
       applySync(await syncWatch(makeTransport(deviceId), watch));
+      // Refresh the watch's weather on this connect (best-effort, non-blocking).
+      void pushWeather(watch).catch(() => undefined);
     } catch (e) {
       if (e instanceof WatchResetError) {
         showAlert(
