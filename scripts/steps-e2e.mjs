@@ -8,7 +8,7 @@
 
 import net from 'node:net';
 import { execFileSync } from 'node:child_process';
-import { readStepCounts } from '../src/ble/syncManager.ts';
+import { readStepCounts, encodeCurrentTime } from '../src/ble/syncManager.ts';
 
 const PORT = 18632;
 const HOST = '127.0.0.1';
@@ -52,16 +52,39 @@ function makeTransport() {
 }
 
 const sim = (...a) => execFileSync('python3', [SIMCTL, ...a], { stdio: 'ignore' });
+const CURRENT_TIME = 2; // BRIDGE_CHAR.currentTime
+const dev = `${HOST}:${PORT}`;
 
-const before = await readStepCounts(makeTransport(), `${HOST}:${PORT}`);
-console.log('before bump:', before);
+// A standalone connection just to set the watch clock (CTS write triggers the
+// firmware's DateTimeController::UpdateTime, which fires OnNewDay at hour 0).
+async function setClock(date) {
+  const t = makeTransport();
+  await t.connect(dev);
+  try {
+    await t.write(CURRENT_TIME, encodeCurrentTime(date));
+  } finally {
+    await t.disconnect();
+  }
+}
 
+// --- 1. today's count reads and increments ---
+await setClock(new Date(2026, 6, 17, 12, 0, 0)); // noon, hour != 0
+const before = await readStepCounts(makeTransport(), dev);
 const BUMPS = 20;
 for (let i = 0; i < BUMPS; i++) sim('key', 'steps-up');
+const afterBump = await readStepCounts(makeTransport(), dev);
+console.log('today before/after bump:', before.today, '->', afterBump.today);
 
-const after = await readStepCounts(makeTransport(), `${HOST}:${PORT}`);
-console.log('after bump:', after, '(yesterday read =', after.yesterday, ')');
+// --- 2. midnight rollover: today should move into yesterday ---
+const preRollToday = afterBump.today;
+await setClock(new Date(2026, 6, 18, 0, 5, 0)); // next day, hour 0 -> OnNewDay -> AdvanceDay
+await new Promise((r) => setTimeout(r, 800)); // let SystemTask process OnNewDay
+const afterRoll = await readStepCounts(makeTransport(), dev);
+console.log('after rollover — today:', afterRoll.today, 'yesterday:', afterRoll.yesterday, `(expected yesterday = ${preRollToday})`);
 
-const pass = after.today > before.today && after.yesterday !== null;
+const pass =
+  afterBump.today > before.today && // today counts
+  afterRoll.yesterday === preRollToday && // yesterday holds the pre-rollover total
+  afterRoll.today < preRollToday; // today reset at rollover
 console.log(pass ? 'STEPS E2E PASS' : 'STEPS E2E FAIL');
 process.exit(pass ? 0 : 1);
