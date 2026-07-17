@@ -20,6 +20,7 @@ import { BeaconScreen } from './src/screens/BeaconScreen';
 import { UpdateScreen } from './src/screens/UpdateScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { WeatherScreen } from './src/screens/WeatherScreen';
+import { StepsScreen } from './src/screens/StepsScreen';
 import { WatchStoreContext } from './src/storage/store';
 import { navTheme, stackScreenOptions, useAppBootstrap } from './src/app/useAppBootstrap';
 import { DesktopBlePicker } from './src/ui/DesktopBlePicker.web';
@@ -50,6 +51,7 @@ export default function App() {
           <Stack.Screen name="Update" component={UpdateScreen} options={{ title: 'Update watch' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="Weather" component={WeatherScreen} options={{ title: 'Weather' }} />
+          <Stack.Screen name="Steps" component={StepsScreen} options={{ title: 'Steps' }} />
         </Stack.Navigator>
         {/* Electron-only Bluetooth overlays; self-disable in plain browsers. */}
         <DesktopBlePicker />

@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Alarms: { watchId: string };
   Beacon: { watchId: string };
   Weather: { watchId: string };
+  Steps: { watchId: string };
   Notifications: { watchId: string };
   Update: { watchId: string };
   AppleLogin: undefined;
