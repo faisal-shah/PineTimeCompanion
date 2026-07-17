@@ -8,7 +8,7 @@
 
 import net from 'node:net';
 import { execFileSync } from 'node:child_process';
-import { readSteps } from '../src/ble/syncManager.ts';
+import { readStepCounts } from '../src/ble/syncManager.ts';
 
 const PORT = 18632;
 const HOST = '127.0.0.1';
@@ -53,15 +53,15 @@ function makeTransport() {
 
 const sim = (...a) => execFileSync('python3', [SIMCTL, ...a], { stdio: 'ignore' });
 
-const before = await readSteps(makeTransport(), `${HOST}:${PORT}`);
-console.log('steps before bump:', before);
+const before = await readStepCounts(makeTransport(), `${HOST}:${PORT}`);
+console.log('before bump:', before);
 
 const BUMPS = 20;
 for (let i = 0; i < BUMPS; i++) sim('key', 'steps-up');
 
-const after = await readSteps(makeTransport(), `${HOST}:${PORT}`);
-console.log('steps after bump:', after);
+const after = await readStepCounts(makeTransport(), `${HOST}:${PORT}`);
+console.log('after bump:', after, '(yesterday read =', after.yesterday, ')');
 
-const pass = after > before;
+const pass = after.today > before.today && after.yesterday !== null;
 console.log(pass ? 'STEPS E2E PASS' : 'STEPS E2E FAIL');
 process.exit(pass ? 0 : 1);

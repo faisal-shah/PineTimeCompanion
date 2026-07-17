@@ -7,7 +7,7 @@ import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { makeTransport } from '../ble/transportFactory';
-import { readSteps } from '../ble/syncManager';
+import { readStepCounts } from '../ble/syncManager';
 import { appendSteps, dateKey, getSteps, StepSample } from '../storage/stepsStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Steps'>;
@@ -51,9 +51,17 @@ export function StepsScreen({ route }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const count = await readSteps(makeTransport(watch.deviceId), watch.deviceId);
+      const { today: count, yesterday } = await readStepCounts(makeTransport(watch.deviceId), watch.deviceId);
       setToday(count);
-      setHistory(await appendSteps(watch.id, dateKey(), count));
+      let merged = await appendSteps(watch.id, dateKey(), count);
+      // Backfill yesterday's accurate final total (the watch rolled it over at
+      // midnight; mergeSamples keeps the max, so it never lowers a day).
+      if (yesterday != null && yesterday > 0) {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        merged = await appendSteps(watch.id, dateKey(y), yesterday);
+      }
+      setHistory(merged);
     } catch (e) {
       setError((e as Error).message);
     } finally {

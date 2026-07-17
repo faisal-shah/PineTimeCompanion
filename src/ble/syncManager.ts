@@ -218,11 +218,27 @@ export async function writeWeather(
   }
 }
 
-/** Read the watch's cumulative step count for today (MotionService, uint32 LE). */
-export async function readSteps(transport: WatchTransport, deviceId: string): Promise<number> {
+/**
+ * Read the watch's step counts (MotionService). Returns today's running total
+ * and yesterday's final total in one connection. Yesterday lets the app backfill
+ * the previous day's accurate total (the watch rolls today into yesterday at
+ * midnight and only keeps those two). Older firmware without the yesterday char
+ * fails that read; we degrade to today-only rather than error.
+ */
+export async function readStepCounts(
+  transport: WatchTransport,
+  deviceId: string,
+): Promise<{ today: number; yesterday: number | null }> {
   await transport.connect(deviceId);
   try {
-    return decodeStepCount(await transport.read(BRIDGE_CHAR.steps));
+    const today = decodeStepCount(await transport.read(BRIDGE_CHAR.steps));
+    let yesterday: number | null = null;
+    try {
+      yesterday = decodeStepCount(await transport.read(BRIDGE_CHAR.stepsYesterday));
+    } catch {
+      yesterday = null; // firmware predates the yesterday characteristic
+    }
+    return { today, yesterday };
   } finally {
     await transport.disconnect().catch(() => undefined);
   }

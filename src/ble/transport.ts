@@ -23,6 +23,7 @@ export const BRIDGE_CHAR = {
   firmwareRevision: 13, // 0x2A26 read
   weather: 14, // 00050001 write (SimpleWeatherService: current + forecast)
   steps: 15, // 00030001 read (MotionService: today's cumulative step count)
+  stepsYesterday: 16, // 00030003 read (MotionService: yesterday's total)
 } as const;
 
 export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];

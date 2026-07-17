@@ -4,6 +4,7 @@
 
 export const MOTION_SERVICE_UUID = '00030000-78fc-48fe-8e23-433b3a1942d0';
 export const STEP_COUNT_CHAR_UUID = '00030001-78fc-48fe-8e23-433b3a1942d0';
+export const STEP_COUNT_YESTERDAY_CHAR_UUID = '00030003-78fc-48fe-8e23-433b3a1942d0';
 
 /** Decode the 4-byte little-endian step count. */
 export function decodeStepCount(bytes: Uint8Array): number {
