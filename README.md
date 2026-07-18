@@ -220,6 +220,35 @@ reboot → BootReceiver → auto-reconnect; the on-device Notification-Access gr
 flow; and the live `onNotificationPosted` push (proven with real notifications on
 the emulator; flaky only for `cmd notification post` on the preview API image).
 
+## Music control (Android)
+
+Bundled with the per-watch **Forward notifications** toggle (same native service
+and persistent connection — no extra switch): the watch's Music app mirrors the
+phone's now-playing state, and its buttons control the phone.
+
+- Phone→watch: `SystemMediaSource` follows the phone's media sessions
+  (`MediaSessionManager` via the granted notification listener; prefers the
+  PLAYING session, ignores stateless assistant/system sessions, and re-picks on
+  any session's state change) and `MusicBridge` writes only changed
+  characteristics (artist/track/album ≤40 bytes with UTF-8-safe truncation,
+  4-byte big-endian position/duration; positions within ±2 s of the watch's own
+  extrapolation are skipped). A full snapshot re-sends everything when the watch
+  opens its Music app (OPEN event), reconnects, or the session switches.
+- Watch→phone: play/pause/next/prev act on the session's transport controls;
+  the volume buttons adjust `STREAM_MUSIC`. The NotificationsScreen shows a
+  live "Now playing" line.
+
+Fully sim-verified, both directions: `scripts/music-watch-e2e.mjs` (watch side —
+metadata renders, every button/swipe event byte asserted, incl. OPEN on entry)
+and `scripts/music-e2e.mjs` / `npm run music:e2e` (emulator closed loop — a
+debug-hosted **real** `MediaSession` drives the real media path; watch taps come
+back as `skipToNext`/`pause` on the session and a real `STREAM_MUSIC` volume
+change). Needed sim enablement, no firmware change: InfiniSim now exposes the
+music characteristics, tags notifications by attribute handle, reports a fake
+connection handle while a bridge client is attached, and compiles with
+`-funsigned-char` to match ARM char semantics. Hardware-deferred: only the
+`GattWatchConnection` music-char/CCCD specifics (same residue as ANS).
+
 ## Weather
 
 The **Weather** hub feature pushes current conditions + a 5-day forecast to the
