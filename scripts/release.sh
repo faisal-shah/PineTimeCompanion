@@ -57,6 +57,7 @@ gh release create "$TAG" --prerelease --title "$TAG" --notes "$(cat <<EOF
 - **macOS** (Apple silicon): \`.dmg\` — unsigned: right-click the app → Open the first time
   (or \`xattr -dr com.apple.quarantine "/Applications/PineTime Companion.app"\`)
 - **Web**: https://faisal-shah.github.io/PineTimeCompanion/ (Chrome/Edge; Web Bluetooth)
+- **Feature guide**: \`-Feature-Guide.pdf\` — the watch + companion walkthrough
 
 Desktop/web manage watches and beacon keys; Apple Find My location + map are Android-only.
 In plain browsers, reconnecting to a watch re-shows the Bluetooth chooser once per session;

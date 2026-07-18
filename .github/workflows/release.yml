@@ -120,6 +120,21 @@ jobs:
           cd desktop/dist && zip -qr "../../PineTimeCompanion-${TAG#v}-web.zip" .
           cd ../.. && gh release upload "$TAG" "PineTimeCompanion-${TAG#v}-web.zip" --clobber
 
+  guide:
+    # Attaches the pre-generated feature guide PDF (committed under docs/) to the
+    # release. Static file — no build, just upload.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Attach the feature guide to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp docs/PineTime-Companion-Feature-Guide.pdf "PineTimeCompanion-${TAG#v}-Feature-Guide.pdf"
+          gh release upload "$TAG" "PineTimeCompanion-${TAG#v}-Feature-Guide.pdf" --clobber
+
   pages:
     # Deploys the web app to https://faisal-shah.github.io/PineTimeCompanion/
     # on every release (prereleases included, so the site can be checked during
