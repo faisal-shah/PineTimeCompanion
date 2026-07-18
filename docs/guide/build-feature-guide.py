@@ -47,6 +47,18 @@ FLAG = [
      ["Generate a key pair, provision it to the watch, and turn beaconing on (Settings → Find My); nearby iPhones then report its location to Apple's Find My network.",
       "The app pulls the crowd-sourced fixes and plots the watch's location — with its recent trail and accuracy — on a live map.",
       "Export the keys to also look the watch up in your own macless-haystack server."]),
+    ("Weather", "Live forecast pushed to the wrist",
+     ("watch-weather.png", "Weather app → current + 5-day forecast"),
+     ("companion-weather.png", "Companion → Weather"),
+     ["Fetched from Open-Meteo (no account, no API key) for the watch's location — its prayer-times coordinates or the phone's GPS.",
+      "Current temperature, icon, and a five-day forecast reach the Weather app and the watch-face widget, refreshed on every connect.",
+      "The watch keeps it for 24 hours and converts °C/°F itself — real data on the wrist even when the phone is away."]),
+    ("Step history", "Durable daily step tracking on the phone",
+     ("watch-steps.png", "Steps app on the watch"),
+     ("companion-steps.png", "Companion → 14-day step chart"),
+     ["The watch counts steps itself but only holds today and yesterday; the app reads and keeps the durable daily history.",
+      "A 14-day bar chart (today highlighted, goal line) shows the trend — tap any bar for that day's count.",
+      "Reading the watch's yesterday total backfills the previous day, so a late or missed read never undercounts."]),
     ("Firmware &amp; resources update (OTA)", "Update InfiniTime straight from the app",
      ("watch-ota.png", "“Firmware &amp; files” must be enabled"),
      ("companion-update.png", "Companion → Update watch"),
@@ -59,9 +71,9 @@ FLAG = [
 APPS = [
     ("watch-stopwatch.png", "Stopwatch", "Start / lap / reset timing."),
     ("watch-timer.png", "Timer", "Countdown with vibration alert."),
-    ("watch-steps.png", "Steps", "Daily step count vs. goal."),
+    ("watch-steps.png", "Steps", "Daily count + on-phone history."),
     ("watch-heartrate.png", "Heart rate", "On-demand optical HR reading."),
-    ("watch-music.png", "Music", "Remote control for phone playback."),
+    ("watch-music.png", "Music", "Controls the phone's playback."),
     ("watch-navigation.png", "Navigation", "Turn-by-turn arrows from the phone."),
     ("watch-calculator.png", "Calculator", "Basic on-wrist calculator."),
     ("watch-metronome.png", "Metronome", "Adjustable tempo with haptic beat."),
@@ -115,17 +127,17 @@ def feature_card(title, sub, wi, wc, pi, pc, bullets):
       </div>
     </div>"""
 
-# First four features: two per page (Schedule+Alarms, Prayer+Find My).
+# Six features, two per page (Schedule+Alarms, Prayer+Find My, Weather+Steps).
 parts.append('<section class="page"><div class="section-tag">Flagship features</div><h2>What makes this build special</h2>')
 parts.append('<p class="lead">Capabilities the companion drives end-to-end &mdash; shown on the watch and in the app.</p>')
-for i, (title, sub, (wi, wc), (pi, pc), bullets) in enumerate(FLAG[:4]):
+for i, (title, sub, (wi, wc), (pi, pc), bullets) in enumerate(FLAG[:6]):
     parts.append(feature_card(title, sub, wi, wc, pi, pc, bullets))
-    if i == 1:
+    if i in (1, 3):
         parts.append('</section><section class="page">')
 parts.append('</section>')
 
-# Fifth feature (OTA) gets its own deep-dive page.
-t, s, (wi, wc), (pi, pc), bullets = FLAG[4]
+# The OTA feature gets its own deep-dive page.
+t, s, (wi, wc), (pi, pc), bullets = FLAG[6]
 parts.append(f"""
 <section class="page">
   <div class="section-tag">Flagship features</div>
@@ -139,18 +151,37 @@ parts.append(f"""
   </div>
 </section>""")
 
-# NOTIFICATIONS
+# NOTIFICATION FORWARDING + MUSIC (the live phone bridge)
 parts.append(f"""
 <section class="page">
   <div class="section-tag">Notifications &amp; alerts</div>
-  <h2>Notifications that don&rsquo;t get lost</h2>
-  <p class="lead">Two kinds reach the watch: phone notifications forwarded from your phone, and watch-originated alerts (alarm, reminder, prayer) that fire on-wrist.</p>
+  <h2>Your phone on your wrist</h2>
+  <p class="lead">On Android the app keeps a background connection to the watch and mirrors your phone &mdash; notifications, incoming calls, and now-playing music &mdash; all under one per-watch switch.</p>
   <div class="row center gap">
     {watch("watch-notification.png", "A forwarded phone notification")}
-    {watch("watch-pendingalerts.png", "The pending-alerts queue (1 of 2)")}
+    {watch("watch-music.png", "Now-playing pushed to the Music app")}
   </div>
   <div class="note">
-    <b>The pending-alerts queue.</b> Every watch-originated alert &mdash; a multi-alarm going off, a schedule reminder, a prayer-time alert &mdash; lands in one shared queue instead of each app owning a screen that the next alert would trample. Miss one while another is ringing and it still waits for you: the queue holds the most recent alerts (newest first), shows a <b>1 / N</b> counter so you can page through them, and you clear each with <b>OK</b>. Phone notifications (messages, calls) stack separately in the swipe-down notifications list.
+    <b>Notification forwarding, per watch.</b> Turn on <b>Forward notifications</b> for a watch and the alerts from the apps you choose (a searchable allowlist) show up on its wrist; incoming calls ring it with the caller's name. It's <b>per watch on purpose</b> &mdash; forward to your own watch but not the kids'. A grant of Android's Notification Access is all it needs; a foreground service keeps the link alive with the app swiped away.
+  </div>
+  <div class="note">
+    <b>Music control</b> rides the same switch. The watch's Music app shows the current track, artist and progress from whatever's playing on the phone, and its buttons drive the phone back &mdash; play/pause, next/previous, and volume. Change the song on the phone and the wrist follows; skip on the wrist and the phone skips.
+  </div>
+</section>
+""")
+
+# WATCH-ORIGINATED ALERTS
+parts.append(f"""
+<section class="page">
+  <div class="section-tag">Notifications &amp; alerts</div>
+  <h2>Watch alerts that don&rsquo;t get lost</h2>
+  <p class="lead">Separately from forwarded phone notifications, alerts the watch raises itself &mdash; alarms, schedule reminders, prayer times &mdash; share one queue so a new one never tramples the last.</p>
+  <div class="row center gap">
+    {watch("watch-pendingalerts.png", "The pending-alerts queue (1 of 2)")}
+    {watch("watch-schedule.png", "Reminders live on the watch")}
+  </div>
+  <div class="note">
+    <b>The pending-alerts queue.</b> Every watch-originated alert &mdash; a multi-alarm going off, a schedule reminder, a prayer-time alert &mdash; lands in one shared queue instead of each app owning a screen that the next alert would trample. Miss one while another is ringing and it still waits for you: the queue holds the most recent alerts (newest first), shows a <b>1 / N</b> counter so you can page through them, and you clear each with <b>OK</b>.
   </div>
 </section>
 """)
@@ -197,7 +228,7 @@ parts.append(f"""
     {phone("companion-hub.png", "The watch hub")}
   </div>
   <div class="note">
-    <b>From the hub</b> you reach every feature (Schedule, Alarms, Prayer times, Find My, Update) and the quick actions: <b>Set time</b>, read <b>Battery</b>, and send a <b>Message</b> to the watch. Pairing works against a real watch over Bluetooth or against the InfiniTime simulator during development.
+    <b>From the hub</b> you reach every feature &mdash; Schedule, Alarms, Prayer times, Find My, Weather, Steps, Notifications, and Update &mdash; plus the quick actions: <b>Set time</b>, read <b>Battery</b>, and send a <b>Message</b> to the watch. Pairing works against a real watch over Bluetooth or against the InfiniTime simulator during development.
   </div>
 </section>
 """)
