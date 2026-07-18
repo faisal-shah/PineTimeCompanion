@@ -34,6 +34,7 @@ object DebugMediaSession {
       })
       isActive = true
     }
+    publishState() // give the session a real state so the pick can prefer it
     Log.i(TAG, "debug media session started")
   }
 

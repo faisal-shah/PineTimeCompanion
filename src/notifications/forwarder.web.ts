@@ -4,7 +4,7 @@
 // "Android only" note.
 
 import type { EventSubscription } from 'expo-modules-core';
-import type { ForwarderStatus, InstalledApp, ConnState } from '../../modules/notification-forwarder';
+import type { ForwarderStatus, InstalledApp, ConnState, NowPlaying } from '../../modules/notification-forwarder';
 import { Watch } from '../model/types';
 
 export const forwarderAvailable = false;
@@ -32,6 +32,10 @@ export function resumeConnections(_deviceId: string): Promise<void> {
 }
 
 export function onConnectionState(_cb: (e: { deviceId: string; state: ConnState }) => void): EventSubscription {
+  return { remove() {} };
+}
+
+export function onNowPlaying(_cb: (e: { nowPlaying: NowPlaying | null }) => void): EventSubscription {
   return { remove() {} };
 }
 

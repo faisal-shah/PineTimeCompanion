@@ -4,7 +4,7 @@
 // guard is needed here.
 
 import type { EventSubscription } from 'expo-modules-core';
-import Native, { type ConnState, type ForwarderStatus, type InstalledApp } from '../../modules/notification-forwarder';
+import Native, { type ConnState, type ForwarderStatus, type InstalledApp, type NowPlaying } from '../../modules/notification-forwarder';
 import { Watch } from '../model/types';
 import { getNotificationSettings } from '../storage/notificationSettings';
 
@@ -37,6 +37,10 @@ export function resumeConnections(deviceId: string): Promise<void> {
 
 export function onConnectionState(cb: (e: { deviceId: string; state: ConnState }) => void): EventSubscription {
   return Native.addListener('onConnectionState', cb);
+}
+
+export function onNowPlaying(cb: (e: { nowPlaying: NowPlaying | null }) => void): EventSubscription {
+  return Native.addListener('onNowPlaying', cb);
 }
 
 /**

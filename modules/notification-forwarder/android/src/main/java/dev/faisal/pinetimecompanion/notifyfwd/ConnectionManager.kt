@@ -43,6 +43,15 @@ object ConnectionManager {
 
   fun musicBridge(): MusicBridge? = musicBridge
 
+  /** Called when Notification Access (re)connects: the media source may have
+   *  failed with SecurityException before the grant — restart it. */
+  fun restartMusicSource() {
+    musicBridge?.let {
+      it.stop()
+      it.start()
+    }
+  }
+
   fun init(context: Context) {
     if (appContext == null) appContext = context.applicationContext
     if (mediaSourceFactory == null) {

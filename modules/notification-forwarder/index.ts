@@ -32,14 +32,23 @@ export interface ConnectionStatus {
   state: ConnState;
 }
 
+export interface NowPlaying {
+  artist: string;
+  track: string;
+  playing: boolean;
+}
+
 export interface ForwarderStatus {
   serviceRunning: boolean;
   connections: ConnectionStatus[];
+  /** Current phone media session state, when music bridging is active. */
+  nowPlaying?: NowPlaying | null;
 }
 
 export type ForwarderEvents = {
   onConnectionState: (event: { deviceId: string; state: ConnState }) => void;
   onCallEvent: (event: { deviceId: string; event: number }) => void;
+  onNowPlaying: (event: { nowPlaying: NowPlaying | null }) => void;
 };
 
 declare class NotificationForwarderModule extends NativeModule<ForwarderEvents> {

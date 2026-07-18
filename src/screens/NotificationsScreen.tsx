@@ -9,11 +9,13 @@ import { colors, spacing } from '../ui/theme';
 import {
   forwarderAvailable,
   getInstalledApps,
+  getStatus,
   isNotificationAccessGranted,
+  onNowPlaying,
   openNotificationAccessSettings,
   syncForwarderConfig,
 } from '../notifications/forwarder';
-import type { InstalledApp } from '../../modules/notification-forwarder';
+import type { InstalledApp, NowPlaying } from '../../modules/notification-forwarder';
 import { getNotificationSettings, saveNotificationSettings } from '../storage/notificationSettings';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
@@ -24,6 +26,7 @@ export function NotificationsScreen({ route }: Props) {
   const watch = watches.find((w) => w.id === route.params.watchId);
 
   const [granted, setGranted] = useState(true);
+  const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [forwardCalls, setForwardCalls] = useState(true);
   const [allowed, setAllowed] = useState<string[]>([]);
   const [apps, setApps] = useState<InstalledApp[] | null>(null);
@@ -34,6 +37,9 @@ export function NotificationsScreen({ route }: Props) {
   useFocusEffect(
     useCallback(() => {
       isNotificationAccessGranted().then(setGranted);
+      getStatus().then((st) => setNowPlaying(st.nowPlaying ?? null)).catch(() => undefined);
+      const sub = onNowPlaying((e) => setNowPlaying(e.nowPlaying));
+      return () => sub.remove();
     }, []),
   );
 
@@ -110,7 +116,7 @@ export function NotificationsScreen({ route }: Props) {
       <View style={styles.row}>
         <View style={styles.rowText}>
           <Text style={styles.rowTitle}>Forward to {watch.name}</Text>
-          <Text style={styles.rowSub}>{paired ? 'Keeps this watch connected and mirrors your alerts' : 'Pair this watch first'}</Text>
+          <Text style={styles.rowSub}>{paired ? 'Keeps this watch connected; mirrors your alerts and music' : 'Pair this watch first'}</Text>
         </View>
         <Switch
           value={!!watch.forwardNotifications}
@@ -119,6 +125,15 @@ export function NotificationsScreen({ route }: Props) {
           testID="toggle-forward"
         />
       </View>
+
+      {watch.forwardNotifications && (
+        <View style={styles.nowPlayingRow} testID="now-playing">
+          <Text style={styles.nowPlayingIcon}>{nowPlaying?.playing ? '🎵' : '🎧'}</Text>
+          <Text style={styles.nowPlayingText} numberOfLines={1}>
+            {nowPlaying ? `${nowPlaying.artist || 'Unknown'} — ${nowPlaying.track || 'Unknown'}` : 'Nothing playing'}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.row}>
         <View style={styles.rowText}>
@@ -176,6 +191,10 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, marginRight: spacing(1.5) },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rowSub: { color: colors.textDim, fontSize: 13, marginTop: 2, lineHeight: 18 },
+
+  nowPlayingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(2), marginTop: -spacing(0.5), marginBottom: spacing(1.5) },
+  nowPlayingIcon: { fontSize: 14, marginRight: spacing(1) },
+  nowPlayingText: { color: colors.textDim, fontSize: 13, flex: 1 },
 
   sectionLabel: { color: colors.textDim, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginTop: spacing(2), marginBottom: spacing(0.5) },
   sectionHint: { color: colors.textDim, fontSize: 13, lineHeight: 18, marginBottom: spacing(1) },

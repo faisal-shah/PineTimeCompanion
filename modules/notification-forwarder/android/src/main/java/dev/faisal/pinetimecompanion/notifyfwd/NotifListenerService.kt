@@ -23,6 +23,8 @@ class NotifListenerService : NotificationListenerService() {
   override fun onListenerConnected() {
     Log.i(TAG, "listener connected")
     ConnectionManager.init(applicationContext)
+    // Access may have just been granted; the media source needs it.
+    ConnectionManager.restartMusicSource()
     // Sync whatever is already showing when forwarding (re)starts, so the watch
     // catches up on notifications posted while it was disconnected. Dedupe keeps
     // this from double-sending against the live onNotificationPosted callback.
