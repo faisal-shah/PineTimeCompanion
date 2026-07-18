@@ -98,6 +98,11 @@ export function NotificationsScreen({ route }: Props) {
   }
 
   const paired = !!watch.deviceId;
+  // A media session with no title/artist isn't meaningfully "playing" anything.
+  const playingLabel =
+    nowPlaying && (nowPlaying.artist || nowPlaying.track)
+      ? `${nowPlaying.artist || 'Unknown'} — ${nowPlaying.track || 'Unknown'}`
+      : null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
@@ -128,9 +133,9 @@ export function NotificationsScreen({ route }: Props) {
 
       {watch.forwardNotifications && (
         <View style={styles.nowPlayingRow} testID="now-playing">
-          <Text style={styles.nowPlayingIcon}>{nowPlaying?.playing ? '🎵' : '🎧'}</Text>
+          <Text style={styles.nowPlayingIcon}>{playingLabel ? '🎵' : '🎧'}</Text>
           <Text style={styles.nowPlayingText} numberOfLines={1}>
-            {nowPlaying ? `${nowPlaying.artist || 'Unknown'} — ${nowPlaying.track || 'Unknown'}` : 'Nothing playing'}
+            {playingLabel ?? 'Nothing playing'}
           </Text>
         </View>
       )}

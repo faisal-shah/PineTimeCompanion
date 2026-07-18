@@ -158,8 +158,9 @@ parts.append(f"""
   <h2>Your phone on your wrist</h2>
   <p class="lead">On Android the app keeps a background connection to the watch and mirrors your phone &mdash; notifications, incoming calls, and now-playing music &mdash; all under one per-watch switch.</p>
   <div class="row center gap">
-    {watch("watch-notification.png", "A forwarded phone notification")}
-    {watch("watch-music.png", "Now-playing pushed to the Music app")}
+    {watch("watch-notification.png", "Forwarded notification")}
+    {phone("companion-notifications.png", "Companion → Notifications")}
+    {watch("watch-music.png", "Now-playing on the Music app")}
   </div>
   <div class="note">
     <b>Notification forwarding, per watch.</b> Turn on <b>Forward notifications</b> for a watch and the alerts from the apps you choose (a searchable allowlist) show up on its wrist; incoming calls ring it with the caller's name. It's <b>per watch on purpose</b> &mdash; forward to your own watch but not the kids'. A grant of Android's Notification Access is all it needs; a foreground service keeps the link alive with the app swiped away.
