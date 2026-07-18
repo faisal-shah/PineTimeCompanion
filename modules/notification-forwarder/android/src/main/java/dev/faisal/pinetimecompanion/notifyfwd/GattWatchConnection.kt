@@ -21,9 +21,11 @@ import java.util.UUID
 /**
  * Persistent BLE link to a real watch. Owns an Android [BluetoothGatt] client
  * directly (not react-native-ble-plx) so forwarding keeps working with the RN
- * app swiped away. Writes the ANS New Alert char (0x2A46) with serialized GATT
- * writes, subscribes to the call-event char to log accept/reject/mute, and
- * reconnects with backoff (autoConnect=true) after a drop.
+ * app swiped away. Writes are addressed per [WatchChar] (ANS alerts, music
+ * metadata) through one serialized queue; notifications are subscribed on the
+ * call-event and music-event chars (chained CCCD writes) and routed by UUID.
+ * Reconnects with backoff (autoConnect=true) after a drop. A watch on older
+ * firmware without the music service just has those writes dropped silently.
  *
  * Hardware-verified path (the emulator e2e uses [SimTcpWatchConnection]).
  */
@@ -34,26 +36,26 @@ class GattWatchConnection(
   override val deviceId: String,
   private val onState: (String, ConnState) -> Unit,
   private val onCallEvent: (String, Int) -> Unit,
+  private val onMusicEvent: (String, Int) -> Unit = { _, _ -> },
 ) : WatchConnection {
   private companion object {
     const val TAG = "NotifyFwd/Gatt"
-    val ANS_SERVICE: UUID = UUID.fromString("00001811-0000-1000-8000-00805f9b34fb")
-    val NEW_ALERT: UUID = UUID.fromString("00002a46-0000-1000-8000-00805f9b34fb")
-    val CALL_EVENT: UUID = UUID.fromString("00020001-78fc-48fe-8e23-433b3a1942d0")
     val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     val ENABLE_NOTIFY = byteArrayOf(0x01, 0x00)
+    const val QUEUE_DEPTH = 32 // a music snapshot is ~7 writes; must not evict alerts
   }
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val backoff = Backoff()
-  private val queue = ArrayDeque<ByteArray>()
+  private val queue = ArrayDeque<Pair<WatchChar, ByteArray>>()
   private val lock = Any()
 
   @Volatile private var running = false
   @Volatile private var current = ConnState.IDLE
   @Volatile private var inFlight = false
   private var gatt: BluetoothGatt? = null
-  private var alertChar: BluetoothGattCharacteristic? = null
+  private var chars = HashMap<WatchChar, BluetoothGattCharacteristic>()
+  private val pendingSubscribes = ArrayDeque<WatchChar>()
 
   override fun state(): ConnState = current
 
@@ -74,10 +76,10 @@ class GattWatchConnection(
     scope.cancel()
   }
 
-  override fun send(payload: ByteArray) {
+  override fun send(char: WatchChar, payload: ByteArray) {
     synchronized(lock) {
-      if (queue.size >= 16) queue.pollFirst() // drop oldest
-      queue.addLast(payload)
+      if (queue.size >= QUEUE_DEPTH) queue.pollFirst() // drop oldest
+      queue.addLast(char to payload)
     }
     pump()
   }
@@ -107,17 +109,26 @@ class GattWatchConnection(
     } catch (_: SecurityException) {
     }
     gatt = null
-    alertChar = null
+    chars = HashMap()
+    pendingSubscribes.clear()
     inFlight = false
   }
 
   private fun pump() {
     if (current != ConnState.READY || inFlight) return
-    val char = alertChar ?: return
-    val next = synchronized(lock) { queue.pollFirst() } ?: return
+    val next = synchronized(lock) {
+      // Skip chars this watch doesn't have (older firmware without music).
+      while (true) {
+        val head = queue.peekFirst() ?: break
+        if (chars[head.first] != null) break
+        queue.pollFirst()
+      }
+      queue.pollFirst()
+    } ?: return
+    val char = chars[next.first] ?: return
     inFlight = true
     try {
-      writeChar(char, next)
+      writeChar(char, next.second)
     } catch (e: SecurityException) {
       inFlight = false
     }
@@ -145,6 +156,23 @@ class GattWatchConnection(
     }
   }
 
+  /** Subscribe the next pending notify char; returns false when none left. */
+  private fun subscribeNext(g: BluetoothGatt): Boolean {
+    while (true) {
+      val wc = pendingSubscribes.pollFirst() ?: break
+      val char = chars[wc] ?: continue
+      val cccd = char.getDescriptor(CCCD) ?: continue
+      try {
+        g.setCharacteristicNotification(char, true)
+        writeCccd(g, cccd)
+        return true
+      } catch (_: SecurityException) {
+        // fall through to the next candidate
+      }
+    }
+    return false
+  }
+
   private val callback = object : BluetoothGattCallback() {
     override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
       when (newState) {
@@ -160,31 +188,40 @@ class GattWatchConnection(
     }
 
     override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
-      val service = g.getService(ANS_SERVICE)
-      alertChar = service?.getCharacteristic(NEW_ALERT)
-      if (alertChar == null) {
+      val map = HashMap<WatchChar, BluetoothGattCharacteristic>()
+      val ans = g.getService(WatchChar.ANS_SERVICE)
+      val music = g.getService(WatchChar.MUSIC_SERVICE)
+      for (wc in WatchChar.entries) {
+        val service = when {
+          ans?.getCharacteristic(wc.gattUuid) != null -> ans
+          music?.getCharacteristic(wc.gattUuid) != null -> music
+          else -> null
+        }
+        service?.getCharacteristic(wc.gattUuid)?.let { map[wc] = it }
+      }
+      chars = map
+      if (map[WatchChar.NEW_ALERT] == null) {
         Log.w(TAG, "$deviceId has no ANS New Alert char; will retry")
         try { g.disconnect() } catch (_: SecurityException) {}
         return
       }
-      // Subscribe to the call-event char (best effort). READY is set here or in
-      // onDescriptorWrite once the CCCD lands.
-      val eventChar = service.getCharacteristic(CALL_EVENT)
-      val cccd = eventChar?.getDescriptor(CCCD)
-      if (eventChar != null && cccd != null) {
-        try {
-          g.setCharacteristicNotification(eventChar, true)
-          writeCccd(g, cccd)
-        } catch (_: SecurityException) {
-          becomeReady()
-        }
-      } else {
+      if (music == null) {
+        Log.i(TAG, "$deviceId has no music service (older firmware); music writes will be dropped")
+      }
+      // Chain the CCCD subscribes (call event, then music event); READY once the
+      // last one lands (or none are available).
+      pendingSubscribes.clear()
+      pendingSubscribes.add(WatchChar.CALL_EVENT)
+      pendingSubscribes.add(WatchChar.MUSIC_EVENT)
+      if (!subscribeNext(g)) {
         becomeReady()
       }
     }
 
     override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-      becomeReady()
+      if (!subscribeNext(g)) {
+        becomeReady()
+      }
     }
 
     override fun onCharacteristicWrite(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
@@ -194,15 +231,20 @@ class GattWatchConnection(
 
     @Suppress("DEPRECATION")
     override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-      if (characteristic.uuid == CALL_EVENT) {
-        val v = characteristic.value
-        if (v != null && v.isNotEmpty()) onCallEvent(deviceId, v[0].toInt() and 0xFF)
-      }
+      val v = characteristic.value
+      if (v != null && v.isNotEmpty()) routeNotify(characteristic.uuid, v[0].toInt() and 0xFF)
     }
 
     // API 33+ delivers the value as a parameter.
     override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-      if (characteristic.uuid == CALL_EVENT && value.isNotEmpty()) onCallEvent(deviceId, value[0].toInt() and 0xFF)
+      if (value.isNotEmpty()) routeNotify(characteristic.uuid, value[0].toInt() and 0xFF)
+    }
+  }
+
+  private fun routeNotify(uuid: UUID, byte: Int) {
+    when (uuid) {
+      WatchChar.CALL_EVENT.gattUuid -> onCallEvent(deviceId, byte)
+      WatchChar.MUSIC_EVENT.gattUuid -> onMusicEvent(deviceId, byte)
     }
   }
 

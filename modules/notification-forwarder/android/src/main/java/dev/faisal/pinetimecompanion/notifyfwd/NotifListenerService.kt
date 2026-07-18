@@ -55,9 +55,9 @@ class NotifListenerService : NotificationListenerService() {
     Log.d(TAG, "posted ${sbn.packageName} '${incoming.title}' -> ${d::class.simpleName}")
     when (d) {
       is NotificationFilter.Decision.ForwardNotification ->
-        ConnectionManager.broadcast(AnsCodec.encodeNotification(d.title, d.body))
+        ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeNotification(d.title, d.body))
       is NotificationFilter.Decision.ForwardCall ->
-        ConnectionManager.broadcast(AnsCodec.encodeIncomingCall(d.caller))
+        ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeIncomingCall(d.caller))
       is NotificationFilter.Decision.Drop -> {}
     }
   }

@@ -41,7 +41,7 @@ const logSince = async (grep) => (await adb('logcat', '-d', '-s', 'NotifyFwd/Sim
 // --- 1. apply config: sim watch, allow the shell package, calls on ---
 await adb('logcat', '-c');
 await setConfig({ enabledWatches: [{ deviceId: '10.0.2.2:18632', name: 'Sim' }], allowedPackages: ['com.android.shell'], forwardCalls: true });
-await sleep(4);
+await sleep(4000);
 if (!(await logSince('connected to sim')).length) fail('SimTcpWatchConnection did not connect to the sim');
 console.log('1. connected to the sim over the bridge');
 
@@ -65,7 +65,7 @@ console.log('3. incoming call forwarded + ring screen shown');
 
 // --- 4. negative: a watch with forwarding off must have no connection ---
 await setConfig({ enabledWatches: [], allowedPackages: ['com.android.shell'], forwardCalls: true });
-await sleep(2);
+await sleep(2000);
 const status = await adb('logcat', '-d', '-s', 'NotifyFwd/ConnMgr');
 if (!status.includes('0 live connection')) console.log('   (note: could not confirm teardown log)');
 console.log('4. disabling forwarding tears the connection down');

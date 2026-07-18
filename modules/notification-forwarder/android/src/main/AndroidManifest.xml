@@ -55,6 +55,10 @@
         <action android:name="dev.faisal.pinetimecompanion.notifyfwd.SET_CONFIG" />
         <action android:name="dev.faisal.pinetimecompanion.notifyfwd.INJECT_CALL" />
         <action android:name="dev.faisal.pinetimecompanion.notifyfwd.INJECT_NOTIF" />
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.MEDIA_START" />
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.MEDIA_SET" />
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.MEDIA_QUERY" />
+        <action android:name="dev.faisal.pinetimecompanion.notifyfwd.MEDIA_STOP" />
       </intent-filter>
     </receiver>
   </application>

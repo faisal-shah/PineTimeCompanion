@@ -15,11 +15,12 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 /**
- * Connects to the InfiniSim TCP GATT bridge and writes ANS alerts (charId 3)
- * using [SimBridgeFraming]. This is the transport the emulator e2e exercises, so
- * the whole native pipeline (listener -> filter -> connection) is verifiable
- * headlessly against a live simulator. Call-event notify frames are parsed and
- * handed to [onCallEvent] (used from Phase 2 of call control).
+ * Connects to the InfiniSim TCP GATT bridge and writes watch characteristics
+ * (ANS alerts, music metadata) using [SimBridgeFraming]. This is the transport
+ * the emulator e2e exercises, so the whole native pipeline (listener/media ->
+ * connection) is verifiable headlessly against a live simulator. Inbound notify
+ * frames are routed by bridge charId: call events -> [onCallEvent], music
+ * events -> [onMusicEvent].
  */
 class SimTcpWatchConnection(
   override val deviceId: String, // "host:port"
@@ -27,14 +28,14 @@ class SimTcpWatchConnection(
   private val port: Int,
   private val onState: (String, ConnState) -> Unit,
   private val onCallEvent: (String, Int) -> Unit,
+  private val onMusicEvent: (String, Int) -> Unit = { _, _ -> },
 ) : WatchConnection {
   private companion object {
     const val TAG = "NotifyFwd/SimTcp"
-    const val NEW_ALERT_CHAR = 3
   }
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  private val queue = Channel<ByteArray>(capacity = 16, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
+  private val queue = Channel<Pair<WatchChar, ByteArray>>(capacity = 32, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
   private val backoff = Backoff()
   @Volatile private var running = false
   @Volatile private var current: ConnState = ConnState.IDLE
@@ -57,8 +58,8 @@ class SimTcpWatchConnection(
     scope.cancel()
   }
 
-  override fun send(payload: ByteArray) {
-    queue.trySend(payload)
+  override fun send(char: WatchChar, payload: ByteArray) {
+    queue.trySend(char to payload)
   }
 
   private suspend fun runLoop() {
@@ -92,11 +93,11 @@ class SimTcpWatchConnection(
     // which ends this coroutine.
     val writer: Job = scope.launch {
       try {
-        for (payload in queue) {
+        for ((char, payload) in queue) {
           if (!running) break
-          output.write(SimBridgeFraming.encodeRequest(NEW_ALERT_CHAR, SimBridgeFraming.OP_WRITE, payload))
+          output.write(SimBridgeFraming.encodeRequest(char.simCharId, SimBridgeFraming.OP_WRITE, payload))
           output.flush()
-          Log.d(TAG, "wrote ${payload.size}B alert to $deviceId")
+          Log.d(TAG, "wrote ${payload.size}B to ${char.name} on $deviceId")
         }
       } catch (_: Exception) {
         // socket died mid-write; the read loop will also unblock and reconnect.
@@ -112,7 +113,11 @@ class SimTcpWatchConnection(
         if (n < 0) break
         for (frame in parser.feed(buf.copyOfRange(0, n))) {
           if (frame is SimBridgeFraming.Frame.Notify && frame.payload.isNotEmpty()) {
-            onCallEvent(deviceId, frame.payload[0].toInt() and 0xFF)
+            when (frame.charId) {
+              WatchChar.CALL_EVENT.simCharId -> onCallEvent(deviceId, frame.payload[0].toInt() and 0xFF)
+              WatchChar.MUSIC_EVENT.simCharId -> onMusicEvent(deviceId, frame.payload[0].toInt() and 0xFF)
+              else -> Log.d(TAG, "unhandled notify charId ${frame.charId}")
+            }
           }
         }
       }

@@ -17,9 +17,9 @@ interface WatchConnection {
   /** Tear down for good. */
   fun stop()
 
-  /** Queue an ANS payload; sent when the link is READY, dropped-oldest if the
-   *  queue overflows (the watch only holds 5 notifications anyway). */
-  fun send(payload: ByteArray)
+  /** Queue a write to a watch characteristic; sent when the link is READY,
+   *  dropped-oldest if the queue overflows. */
+  fun send(char: WatchChar, payload: ByteArray)
 
   fun state(): ConnState
 }

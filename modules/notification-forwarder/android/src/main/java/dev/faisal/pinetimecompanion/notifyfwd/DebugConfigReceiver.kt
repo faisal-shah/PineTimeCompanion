@@ -23,6 +23,10 @@ class DebugConfigReceiver : BroadcastReceiver() {
     const val ACTION_SET_CONFIG = "dev.faisal.pinetimecompanion.notifyfwd.SET_CONFIG"
     const val ACTION_INJECT_CALL = "dev.faisal.pinetimecompanion.notifyfwd.INJECT_CALL"
     const val ACTION_INJECT_NOTIF = "dev.faisal.pinetimecompanion.notifyfwd.INJECT_NOTIF"
+    const val ACTION_MEDIA_START = "dev.faisal.pinetimecompanion.notifyfwd.MEDIA_START"
+    const val ACTION_MEDIA_SET = "dev.faisal.pinetimecompanion.notifyfwd.MEDIA_SET"
+    const val ACTION_MEDIA_QUERY = "dev.faisal.pinetimecompanion.notifyfwd.MEDIA_QUERY"
+    const val ACTION_MEDIA_STOP = "dev.faisal.pinetimecompanion.notifyfwd.MEDIA_STOP"
   }
 
   override fun onReceive(context: Context, intent: Intent) {
@@ -48,16 +52,33 @@ class DebugConfigReceiver : BroadcastReceiver() {
       }
       ACTION_INJECT_CALL -> {
         val caller = intent.getStringExtra("caller") ?: "Test"
-        ConnectionManager.broadcast(AnsCodec.encodeIncomingCall(caller))
+        ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeIncomingCall(caller))
         Log.i(TAG, "injected call from $caller")
       }
       ACTION_INJECT_NOTIF -> {
         // Bypasses the listener to prove the transport+render path directly.
         val title = intent.getStringExtra("title") ?: "Test"
         val body = intent.getStringExtra("body") ?: ""
-        ConnectionManager.broadcast(AnsCodec.encodeNotification(title, body))
+        ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeNotification(title, body))
         Log.i(TAG, "injected notification '$title'")
       }
+      // Debug media session: lets the e2e exercise the REAL SystemMediaSource
+      // path (getActiveSessions -> MediaController -> transportControls).
+      ACTION_MEDIA_START -> DebugMediaSession.start(context)
+      ACTION_MEDIA_SET -> DebugMediaSession.set(
+        artist = intent.getStringExtra("artist") ?: "",
+        track = intent.getStringExtra("track") ?: "",
+        album = intent.getStringExtra("album") ?: "",
+        durationS = intent.getIntExtra("duration", 0).toLong(),
+        positionS = intent.getIntExtra("position", 0).toLong(),
+        isPlaying = intent.getIntExtra("playing", 1) != 0,
+      )
+      ACTION_MEDIA_QUERY -> {
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val vol = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        Log.i(TAG, "media query: commands=${DebugMediaSession.query()} volume=$vol nowPlaying=${ConnectionManager.musicBridge()?.nowPlaying()}")
+      }
+      ACTION_MEDIA_STOP -> DebugMediaSession.stop()
     }
   }
 }

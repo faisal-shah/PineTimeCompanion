@@ -29,15 +29,32 @@ object ConnectionManager {
   /** Optional sinks so the module can emit JS events when the runtime is alive. */
   @Volatile var onConnectionState: ((String, ConnState) -> Unit)? = null
   @Volatile var onCallEvent: ((String, Int) -> Unit)? = null
+  @Volatile var onNowPlaying: ((Triple<String, String, Boolean>?) -> Unit)? = null
+
+  // Music bridging rides the same enabled-watch set: created when any watch is
+  // enabled, torn down when none are. The MediaSource is swapped in by the
+  // module/service init (SystemMediaSource) or a debug fake.
+  @Volatile private var musicBridge: MusicBridge? = null
+  @Volatile private var mediaSourceFactory: (() -> MediaSource)? = null
+
+  fun setMediaSourceFactory(factory: () -> MediaSource) {
+    mediaSourceFactory = factory
+  }
+
+  fun musicBridge(): MusicBridge? = musicBridge
 
   fun init(context: Context) {
     if (appContext == null) appContext = context.applicationContext
+    if (mediaSourceFactory == null) {
+      mediaSourceFactory = { SystemMediaSource(appContext!!) }
+    }
     registerReceiver()
   }
 
   @Synchronized
   fun applyConfig(config: ForwarderConfig) {
     lastConfig = config
+    syncMusicBridge(config)
     val desired = config.enabledWatches.associateBy { it.deviceId }
     // Stop connections no longer wanted.
     for (id in connections.keys.toList()) {
@@ -55,8 +72,8 @@ object ConnectionManager {
     Log.i(TAG, "applyConfig: ${config.enabledWatches.size} desired, ${connections.size} live connection(s)")
   }
 
-  fun broadcast(payload: ByteArray) {
-    for (conn in connections.values) conn.send(payload)
+  fun broadcast(char: WatchChar, payload: ByteArray) {
+    for (conn in connections.values) conn.send(char, payload)
   }
 
   fun hasEnabledWatches(): Boolean = lastConfig.enabledWatches.isNotEmpty()
@@ -80,18 +97,47 @@ object ConnectionManager {
 
   private fun createConnection(deviceId: String): WatchConnection {
     val ctx = appContext!!
-    val dispatchState: (String, ConnState) -> Unit = { id, s -> onConnectionState?.invoke(id, s) }
+    val dispatchState: (String, ConnState) -> Unit = { id, s ->
+      onConnectionState?.invoke(id, s)
+      if (s == ConnState.READY) {
+        // Fresh link: the watch may have rebooted; refresh its music state.
+        musicBridge?.onConnectionReady()
+      }
+    }
     val dispatchCall: (String, Int) -> Unit = { id, e ->
       Log.i(TAG, "call event from $id: $e")
       onCallEvent?.invoke(id, e)
     }
+    val dispatchMusic: (String, Int) -> Unit = { id, e ->
+      Log.i(TAG, "music event from $id: ${MusicCodec.eventName(e)}")
+      musicBridge?.onWatchEvent(e)
+    }
     val parts = deviceId.split(":")
     return if (parts.size == 2) {
-      SimTcpWatchConnection(deviceId, parts[0], parts[1].toInt(), dispatchState, dispatchCall)
+      SimTcpWatchConnection(deviceId, parts[0], parts[1].toInt(), dispatchState, dispatchCall, dispatchMusic)
     } else {
       val adapter = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
       val device = adapter.getRemoteDevice(deviceId)
-      GattWatchConnection(ctx, device, deviceId, dispatchState, dispatchCall)
+      GattWatchConnection(ctx, device, deviceId, dispatchState, dispatchCall, dispatchMusic)
+    }
+  }
+
+  private fun syncMusicBridge(config: ForwarderConfig) {
+    val wantMusic = config.enabledWatches.isNotEmpty()
+    if (wantMusic && musicBridge == null) {
+      val factory = mediaSourceFactory ?: return
+      val bridge = MusicBridge(
+        { char, bytes -> broadcast(char, bytes) },
+        factory(),
+        onNowPlayingChanged = { onNowPlaying?.invoke(it) },
+      )
+      musicBridge = bridge
+      bridge.start()
+      Log.i(TAG, "music bridge started")
+    } else if (!wantMusic && musicBridge != null) {
+      musicBridge?.stop()
+      musicBridge = null
+      Log.i(TAG, "music bridge stopped")
     }
   }
 

@@ -19,7 +19,7 @@ class NotificationForwarderModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("NotificationForwarder")
-    Events("onConnectionState", "onCallEvent")
+    Events("onConnectionState", "onCallEvent", "onNowPlaying")
 
     OnCreate {
       ConnectionManager.init(context)
@@ -28,6 +28,9 @@ class NotificationForwarderModule : Module() {
       }
       ConnectionManager.onCallEvent = { id, event ->
         sendEvent("onCallEvent", mapOf("deviceId" to id, "event" to event))
+      }
+      ConnectionManager.onNowPlaying = { np ->
+        sendEvent("onNowPlaying", mapOf("nowPlaying" to np?.let { mapOf("artist" to it.first, "track" to it.second, "playing" to it.third) }))
       }
     }
 
@@ -83,6 +86,9 @@ class NotificationForwarderModule : Module() {
         "connections" to ConnectionManager.status().map {
           mapOf("deviceId" to it.first, "state" to it.second.name)
         },
+        "nowPlaying" to ConnectionManager.musicBridge()?.nowPlaying()?.let {
+          mapOf("artist" to it.first, "track" to it.second, "playing" to it.third)
+        },
       )
     }
 
@@ -92,7 +98,7 @@ class NotificationForwarderModule : Module() {
     // Dev helper: inject an incoming-call alert (calls can't be posted via the
     // normal notification API in a test).
     AsyncFunction("debugInjectCall") { caller: String ->
-      ConnectionManager.broadcast(AnsCodec.encodeIncomingCall(caller))
+      ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeIncomingCall(caller))
     }
   }
 
