@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -24,6 +24,7 @@ export function UpdateScreen({ route }: Props) {
   const insets = useSafeAreaInsets();
 
   const [repo, setRepo] = useState(DEFAULT_UPDATE_REPO);
+  const [showPrereleases, setShowPrereleases] = useState(false);
   const [repoEditOpen, setRepoEditOpen] = useState(false);
   const [repoDraft, setRepoDraft] = useState('');
   const [firmwareRev, setFirmwareRev] = useState<string | null>(null);
@@ -52,9 +53,15 @@ export function UpdateScreen({ route }: Props) {
   useEffect(() => {
     getUpdateSettings().then((s) => {
       setRepo(s.repo);
+      setShowPrereleases(s.showPrereleases);
       void loadReleases(s.repo);
     });
   }, [loadReleases]);
+
+  const togglePrereleases = (value: boolean) => {
+    setShowPrereleases(value);
+    void saveUpdateSettings({ showPrereleases: value });
+  };
 
   const readRevision = useCallback(async () => {
     if (!deviceId) return;
@@ -156,6 +163,9 @@ export function UpdateScreen({ route }: Props) {
 
   if (!watch) return null;
 
+  const shownReleases = releases?.filter((r) => showPrereleases || !r.prerelease);
+  const hiddenPrereleases = releases ? releases.length - (shownReleases?.length ?? 0) : 0;
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
@@ -225,7 +235,13 @@ export function UpdateScreen({ route }: Props) {
         )}
 
         {/* Releases */}
-        <Text style={styles.sectionLabel}>Available releases</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionLabel}>Available releases</Text>
+          <View style={styles.preToggle}>
+            <Text style={styles.preToggleLabel}>Show pre-releases</Text>
+            <Switch value={showPrereleases} onValueChange={togglePrereleases} testID="toggle-prereleases" />
+          </View>
+        </View>
         {loadError && (
           <View style={styles.card}>
             <Text style={styles.errorText} testID="releases-error">
@@ -237,8 +253,16 @@ export function UpdateScreen({ route }: Props) {
           </View>
         )}
         {!loadError && releases === null && <ActivityIndicator color={colors.accent} style={{ marginTop: spacing(2) }} />}
-        {releases?.length === 0 && <Text style={styles.note}>No installable releases found in {repo}.</Text>}
-        {releases?.map((r) => (
+        {shownReleases?.length === 0 &&
+          (hiddenPrereleases > 0 ? (
+            <Text style={styles.note} testID="only-prereleases-note">
+              {hiddenPrereleases} pre-release{hiddenPrereleases > 1 ? 's' : ''} hidden. Turn on “Show pre-releases” above to
+              install {hiddenPrereleases > 1 ? 'them' : 'it'}.
+            </Text>
+          ) : (
+            <Text style={styles.note}>No installable releases found in {repo}.</Text>
+          ))}
+        {shownReleases?.map((r) => (
           <View key={r.tag} style={styles.card} testID={`release-${r.version}`}>
             <View style={styles.releaseHead}>
               <Text style={styles.releaseVersion}>{r.version}</Text>
@@ -329,14 +353,21 @@ const styles = StyleSheet.create({
   progressTrack: { height: 8, borderRadius: 4, backgroundColor: colors.background, overflow: 'hidden' },
   progressFill: { height: 8, borderRadius: 4, backgroundColor: colors.accent },
 
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing(1),
+    marginBottom: spacing(1),
+  },
   sectionLabel: {
     color: colors.textDim,
     fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginTop: spacing(1),
-    marginBottom: spacing(1),
   },
+  preToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
+  preToggleLabel: { color: colors.textDim, fontSize: 13 },
   errorText: { color: colors.danger, fontSize: 14, marginBottom: spacing(1) },
 
   releaseHead: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
