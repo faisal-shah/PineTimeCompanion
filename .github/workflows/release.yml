@@ -68,6 +68,12 @@ jobs:
             cp "$apk" "PineTimeCompanion-${TAG#v}-android-${abi}.apk"
           done
           gh release upload "$TAG" PineTimeCompanion-*-android-*.apk --clobber
+          # Also a version-agnostic arm64 copy so the download landing page can use a
+          # permanent direct-download URL (/releases/latest/download/<name>). The
+          # latest *promoted* (non-prerelease) release wins.
+          cp android/app/build/outputs/apk/release/app-arm64-v8a-release.apk \
+             PineTimeCompanion-android-arm64-v8a.apk
+          gh release upload "$TAG" PineTimeCompanion-android-arm64-v8a.apk --clobber
 
   desktop:
     strategy:
