@@ -45,3 +45,11 @@ desktop/release/
 
 # Local module Gradle build outputs
 modules/**/build/
+
+# Build binaries are Release assets, never committed (see AGENTS.md "Release discipline").
+*.apk
+*.aab
+*.exe
+*.dmg
+*.AppImage
+*.msi
