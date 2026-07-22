@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
 import {
   forwarderAvailable,
   getInstalledApps,
@@ -21,7 +21,6 @@ import { getNotificationSettings, saveNotificationSettings } from '../storage/no
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
 export function NotificationsScreen({ route }: Props) {
-  const insets = useSafeAreaInsets();
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
@@ -90,10 +89,10 @@ export function NotificationsScreen({ route }: Props) {
 
   if (!forwarderAvailable) {
     return (
-      <View style={[styles.container, styles.center]}>
+      <Screen scroll={false} width="read" contentStyle={styles.center}>
         <Text style={styles.androidOnly}>📵 Notification forwarding is available in the Android app.</Text>
         <Text style={styles.androidOnlySub}>A browser can't run the background listener needed to forward your phone's notifications.</Text>
-      </View>
+      </Screen>
     );
   }
 
@@ -105,7 +104,7 @@ export function NotificationsScreen({ route }: Props) {
       : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+    <Screen width="read">
       {!granted && (
         <View style={styles.banner} testID="access-banner">
           <Text style={styles.bannerTitle}>Notification access needed</Text>
@@ -176,12 +175,11 @@ export function NotificationsScreen({ route }: Props) {
           );
         })
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center', padding: spacing(4) },
   androidOnly: { color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   androidOnlySub: { color: colors.textDim, fontSize: 14, textAlign: 'center', marginTop: spacing(1), lineHeight: 20 },

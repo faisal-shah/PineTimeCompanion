@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { newEventId, useWatchStore, withEvents } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { Button } from '../ui/Button';
 import { RuleKind, WEEKDAY_LABELS, WatchEvent } from '../model/types';
 import { upcoming } from '../model/recurrence';
 
@@ -24,7 +25,6 @@ const todayIso = () => {
 
 export function EventEditScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
-  const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const existing = watch?.events.find((e) => e.id === route.params.eventId);
 
@@ -73,11 +73,7 @@ export function EventEditScreen({ navigation, route }: Props) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag">
+    <Screen width="read">
 
       <Text style={styles.label}>Title (shown on the watch)</Text>
       <TextInput
@@ -169,10 +165,8 @@ export function EventEditScreen({ navigation, route }: Props) {
         ))
       )}
 
-      <Pressable style={styles.saveButton} onPress={save} testID="save-event">
-        <Text style={styles.saveText}>Save</Text>
-      </Pressable>
-    </ScrollView>
+      <Button label="Save" onPress={save} testID="save-event" style={{ marginVertical: spacing(3) }} />
+    </Screen>
   );
 }
 
@@ -209,7 +203,6 @@ function Stepper({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   label: { color: colors.textDim, marginTop: spacing(2), marginBottom: spacing(1), fontSize: 13, textTransform: 'uppercase' },
   input: { backgroundColor: colors.card, color: colors.text, borderRadius: 10, paddingHorizontal: spacing(2), height: 48 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
@@ -227,13 +220,4 @@ const styles = StyleSheet.create({
   stepValue: { color: colors.text, fontSize: 20, minWidth: 40, textAlign: 'center', fontVariant: ['tabular-nums'] },
   preview: { color: colors.text, fontSize: 15, marginBottom: 4 },
   previewNone: { color: colors.warn, fontSize: 15 },
-  saveButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: spacing(3),
-  },
-  saveText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 });

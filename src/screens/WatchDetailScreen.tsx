@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { CardGrid } from '../ui/CardGrid';
+import { Button } from '../ui/Button';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 import { makeTransport } from '../ble/transportFactory';
 import { readBattery, sendMessageToWatch, setWatchTime } from '../ble/syncManager';
@@ -33,7 +35,6 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeText, setComposeText] = useState('');
-  const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
 
   if (!watch) {
@@ -119,7 +120,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       : fallback;
 
   return (
-    <View style={styles.container}>
+    <>
       <Modal visible={composeOpen} transparent animationType="fade" onRequestClose={() => setComposeOpen(false)}>
         <View style={[styles.modalBackdrop, { paddingBottom: keyboardHeight }]}>
           <View style={styles.composeCard}>
@@ -152,7 +153,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         </View>
       </Modal>
 
-      <ScrollView contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+      <Screen width="list">
         {/* Status strip */}
         <View style={styles.status}>
           <View style={styles.statusLeft}>
@@ -170,21 +171,24 @@ export function WatchDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Feature peers */}
-        {FEATURES.map((f) => (
-          <Pressable
-            key={f.key}
-            style={styles.featureRow}
-            onPress={() => navigation.navigate(f.key, { watchId: watch.id })}
-            testID={`feature-${f.key}`}>
-            <Text style={styles.featureIcon}>{f.icon}</Text>
-            <View style={styles.featureBody}>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureSubtitle}>{featureSubtitle(f.key, f.subtitle)}</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-        ))}
+        {/* Feature peers — a responsive grid: multi-column on a wide screen, one
+            full-width column on a phone. */}
+        <CardGrid>
+          {FEATURES.map((f) => (
+            <Pressable
+              key={f.key}
+              style={styles.featureRow}
+              onPress={() => navigation.navigate(f.key, { watchId: watch.id })}
+              testID={`feature-${f.key}`}>
+              <Text style={styles.featureIcon}>{f.icon}</Text>
+              <View style={styles.featureBody}>
+                <Text style={styles.featureTitle}>{f.title}</Text>
+                <Text style={styles.featureSubtitle}>{featureSubtitle(f.key, f.subtitle)}</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          ))}
+        </CardGrid>
 
         {/* Watch actions */}
         <Text style={styles.sectionLabel}>Watch</Text>
@@ -199,11 +203,11 @@ export function WatchDetailScreen({ navigation, route }: Props) {
           <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={busy !== null} />
         </View>
 
-        <Pressable style={styles.deleteButton} onPress={deleteWatch} testID="delete-watch">
-          <Text style={styles.deleteText}>Delete watch</Text>
-        </Pressable>
-      </ScrollView>
-    </View>
+        <View style={styles.deleteWrap}>
+          <Button label="Delete watch" variant="danger" onPress={deleteWatch} testID="delete-watch" />
+        </View>
+      </Screen>
+    </>
   );
 }
 
@@ -217,8 +221,6 @@ function ActionButton({ icon, label, onPress, disabled }: { icon: string; label:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-
   status: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing(2) },
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   dot: { width: 10, height: 10, borderRadius: 5 },
@@ -234,7 +236,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: spacing(2),
     paddingHorizontal: spacing(2),
-    marginBottom: spacing(1.5),
   },
   featureIcon: { fontSize: 28, width: 44, textAlign: 'center' },
   featureBody: { flex: 1, marginLeft: spacing(1) },
@@ -264,8 +265,7 @@ const styles = StyleSheet.create({
   actionIcon: { fontSize: 22 },
   actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
 
-  deleteButton: { marginTop: spacing(4), alignItems: 'center', paddingVertical: spacing(1.5) },
-  deleteText: { color: colors.danger, fontSize: 15, fontWeight: '600' },
+  deleteWrap: { marginTop: spacing(4) },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: spacing(2) },
   composeCard: { backgroundColor: colors.card, borderRadius: 14, padding: spacing(2), width: '100%', maxWidth: 420 },

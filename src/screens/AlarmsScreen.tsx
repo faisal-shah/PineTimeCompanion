@@ -1,11 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
 import { makeTransport } from '../ble/transportFactory';
 import { Alarm, MultiAlarmState } from '../ble/multiAlarmProtocol';
@@ -17,7 +17,6 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 export function AlarmsScreen({ route }: Props) {
   const { watches } = useWatchStore();
-  const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
   const [state, setState] = useState<MultiAlarmState | null>(null);
@@ -52,9 +51,9 @@ export function AlarmsScreen({ route }: Props) {
   }
   if (!watch.deviceId) {
     return (
-      <View style={styles.container}>
+      <Screen width="read">
         <Text style={styles.hint}>Pair this watch first (from its watch screen) to manage alarms.</Text>
-      </View>
+      </Screen>
     );
   }
 
@@ -99,9 +98,7 @@ export function AlarmsScreen({ route }: Props) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+    <Screen width="read">
       <Text style={styles.body}>
         Up to 5 alarms, each daily or one-shot. Managed on the watch — edits here sync over Bluetooth and won't clobber
         another phone's changes.
@@ -174,12 +171,11 @@ export function AlarmsScreen({ route }: Props) {
       )}
 
       {busy === 'Saving' && <Text style={styles.hint}>Syncing to the watch…</Text>}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   body: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginBottom: spacing(2) },
   center: { alignItems: 'center', marginTop: spacing(4), gap: spacing(1) },
   row: {
