@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { VersionFooter } from '../ui/VersionFooter';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { newWatch, useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { CardGrid } from '../ui/CardGrid';
+import { useCapStyle } from '../ui/Screen';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 import { Watch } from '../model/types';
 
@@ -29,6 +31,8 @@ export function WatchListScreen({ navigation }: Props) {
   // Keep the input bar above the keyboard when open, and above the nav bar
   // (gesture pill or 3-button) when closed. See useKeyboardHeight.
   const bottomLift = Math.max(insets.bottom, useKeyboardHeight());
+  const capList = useCapStyle('list'); // the watch grid: centre + cap on wide
+  const capForm = useCapStyle('content'); // the add-watch bar stays a saner width
 
   const addWatch = () => {
     const trimmed = name.trim();
@@ -44,40 +48,38 @@ export function WatchListScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={watches}
-        keyExtractor={(w) => w.id}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: spacing(2) }}
-        ListEmptyComponent={
+      <ScrollView contentContainerStyle={[{ padding: spacing(2) }, capList]} keyboardShouldPersistTaps="handled">
+        {watches.length === 0 ? (
           <Text style={styles.empty}>
             No watches yet.{'\n'}Add one below to start building its schedule.
           </Text>
-        }
-        renderItem={({ item }) => {
-          const status = syncStatus(item);
-          return (
-            <Pressable
-              style={styles.card}
-              onPress={() => navigation.navigate('WatchDetail', { watchId: item.id })}
-              testID={`watch-${item.name}`}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.watchName}>{item.name}</Text>
-                <Text style={[styles.status, { color: status.color }]}>{status.label}</Text>
-              </View>
-              <View style={styles.cardRight}>
-                {item.batteryPercent !== undefined && (
-                  <Text style={styles.battery}>{item.batteryPercent}%</Text>
-                )}
-                <Text style={styles.eventCount}>
-                  {item.events.length}/{item.capacity ?? 64} events
-                </Text>
-              </View>
-            </Pressable>
-          );
-        }}
-      />
-      <View style={[styles.addRow, { marginBottom: bottomLift }]}>
+        ) : (
+          <CardGrid>
+            {watches.map((item) => {
+              const status = syncStatus(item);
+              return (
+                <Pressable
+                  key={item.id}
+                  style={styles.card}
+                  onPress={() => navigation.navigate('WatchDetail', { watchId: item.id })}
+                  testID={`watch-${item.name}`}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.watchName}>{item.name}</Text>
+                    <Text style={[styles.status, { color: status.color }]}>{status.label}</Text>
+                  </View>
+                  <View style={styles.cardRight}>
+                    {item.batteryPercent !== undefined && <Text style={styles.battery}>{item.batteryPercent}%</Text>}
+                    <Text style={styles.eventCount}>
+                      {item.events.length}/{item.capacity ?? 64} events
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </CardGrid>
+        )}
+      </ScrollView>
+      <View style={[styles.addRow, capForm, { marginBottom: bottomLift }]}>
         <TextInput
           style={styles.input}
           placeholder="New watch name"
@@ -105,7 +107,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: spacing(2),
-    marginBottom: spacing(1.5),
     alignItems: 'center',
   },
   watchName: { color: colors.text, fontSize: 18, fontWeight: '600' },

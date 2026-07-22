@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore, withEvents } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { useCapStyle } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
 import { describeRule } from '../model/types';
 import { makeTransport } from '../ble/transportFactory';
@@ -18,6 +19,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
   const watch = watches.find((w) => w.id === route.params.watchId);
   const [busy, setBusy] = useState(false);
   const insets = useSafeAreaInsets();
+  const cap = useCapStyle('read'); // events read as a list; centre + cap on wide
 
   if (!watch) {
     return null;
@@ -110,7 +112,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
       <FlatList
         data={[...watch.events].sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))}
         keyExtractor={(e) => String(e.id)}
-        contentContainerStyle={{ padding: spacing(2) }}
+        contentContainerStyle={[{ padding: spacing(2) }, cap]}
         ListEmptyComponent={<Text style={styles.empty}>No events yet. Add the first one below.</Text>}
         renderItem={({ item }) => (
           <Pressable
@@ -132,7 +134,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
       <Text style={styles.slots} testID="slots-used">
         {watch.events.length} of {capacity} slots used
       </Text>
-      <View style={[styles.bottomRow, { paddingBottom: spacing(2) + insets.bottom }]}>
+      <View style={[styles.bottomRow, cap, { paddingBottom: spacing(2) + insets.bottom }]}>
         <Pressable
           style={[styles.bigButton, { backgroundColor: colors.card }, atCapacity && { opacity: 0.5 }]}
           onPress={addEvent}

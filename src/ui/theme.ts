@@ -7,6 +7,8 @@ export const colors = {
   textDim: '#93a1ad',
   danger: '#c0392b',
   warn: '#d29922',
+  /** Foreground on an accent/danger fill — button labels, etc. */
+  onAccent: '#ffffff',
 };
 
 export const spacing = (n: number) => n * 8;

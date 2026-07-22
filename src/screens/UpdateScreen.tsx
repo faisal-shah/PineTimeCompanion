@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { Button } from '../ui/Button';
 import { showAlert } from '../ui/alert';
 import { makeTransport, isSimulatorDeviceId } from '../ble/transportFactory';
 import { getUpdateSettings, saveUpdateSettings, DEFAULT_UPDATE_REPO } from '../updates/updateSettings';
@@ -21,7 +22,6 @@ interface Progress {
 export function UpdateScreen({ route }: Props) {
   const { watches } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
-  const insets = useSafeAreaInsets();
 
   const [repo, setRepo] = useState(DEFAULT_UPDATE_REPO);
   const [showPrereleases, setShowPrereleases] = useState(false);
@@ -167,8 +167,8 @@ export function UpdateScreen({ route }: Props) {
   const hiddenPrereleases = releases ? releases.length - (shownReleases?.length ?? 0) : 0;
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+    <>
+      <Screen width="content">
         {/* Current firmware */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Installed firmware</Text>
@@ -208,9 +208,7 @@ export function UpdateScreen({ route }: Props) {
               <Text style={styles.bold}>Settings ▸ Firmware</Text> and tap <Text style={styles.bold}>Validate</Text>. If you skip
               this, the next reboot rolls back to the old version.
             </Text>
-            <Pressable style={styles.button} onPress={recheckAfterValidate} disabled={busy} testID="recheck">
-              <Text style={styles.buttonText}>I validated — re-check</Text>
-            </Pressable>
+            <Button label="I validated — re-check" onPress={recheckAfterValidate} disabled={busy} testID="recheck" style={{ marginTop: spacing(1.5) }} />
           </View>
         )}
 
@@ -247,9 +245,7 @@ export function UpdateScreen({ route }: Props) {
             <Text style={styles.errorText} testID="releases-error">
               {loadError}
             </Text>
-            <Pressable style={styles.button} onPress={() => void loadReleases(repo)}>
-              <Text style={styles.buttonText}>Retry</Text>
-            </Pressable>
+            <Button label="Retry" onPress={() => void loadReleases(repo)} style={{ marginTop: spacing(1.5) }} />
           </View>
         )}
         {!loadError && releases === null && <ActivityIndicator color={colors.accent} style={{ marginTop: spacing(2) }} />}
@@ -292,7 +288,7 @@ export function UpdateScreen({ route }: Props) {
             </View>
           </View>
         ))}
-      </ScrollView>
+      </Screen>
 
       <Modal visible={repoEditOpen} transparent animationType="fade" onRequestClose={() => setRepoEditOpen(false)}>
         <View style={styles.modalBackdrop}>
@@ -320,12 +316,11 @@ export function UpdateScreen({ route }: Props) {
           </View>
         </View>
       </Modal>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   card: { backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(1.5) },
   cardLabel: { color: colors.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
   revRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing(0.5) },

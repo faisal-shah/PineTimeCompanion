@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { Button } from '../ui/Button';
 import { WeatherIcon } from '../ble/weatherProtocol';
 import { pushWeather } from '../weather/pushWeather';
 import type { WeatherData } from '../weather/openMeteo';
@@ -35,7 +36,6 @@ const dayLabel = (offset: number) => {
 };
 
 export function WeatherScreen({ route }: Props) {
-  const insets = useSafeAreaInsets();
   const { watches } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
@@ -69,7 +69,7 @@ export function WeatherScreen({ route }: Props) {
   if (!watch) return null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+    <Screen width="read">
       {data && (
         <View style={styles.currentCard} testID="weather-current">
           <Text style={styles.currentIcon}>{emoji(data.current.icon)}</Text>
@@ -101,15 +101,14 @@ export function WeatherScreen({ route }: Props) {
         watch keeps it for 24 hours. Uses this watch&rsquo;s prayer-times location, or your phone&rsquo;s GPS.
       </Text>
 
-      <Pressable style={[styles.button, busy && styles.disabled]} onPress={() => void update()} disabled={busy} testID="weather-update">
-        <Text style={styles.buttonText}>{busy ? 'Updating…' : 'Update now'}</Text>
-      </Pressable>
-    </ScrollView>
+      <View style={styles.buttonWrap}>
+        <Button label={busy ? 'Updating…' : 'Update now'} onPress={() => void update()} disabled={busy} busy={busy} testID="weather-update" />
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   currentCard: { backgroundColor: colors.card, borderRadius: 14, padding: spacing(3), alignItems: 'center', marginBottom: spacing(1.5) },
   currentIcon: { fontSize: 52 },
   currentTemp: { color: colors.text, fontSize: 56, fontWeight: '800', marginTop: spacing(0.5) },
@@ -124,7 +123,5 @@ const styles = StyleSheet.create({
 
   error: { color: colors.danger, fontSize: 14, marginTop: spacing(2), textAlign: 'center' },
   note: { color: colors.textDim, fontSize: 13, lineHeight: 19, marginTop: spacing(2.5) },
-  button: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: spacing(1.5), alignItems: 'center', marginTop: spacing(2) },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  disabled: { opacity: 0.5 },
+  buttonWrap: { marginTop: spacing(2) },
 });

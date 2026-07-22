@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { Button } from '../ui/Button';
 import { AsrMadhab, PrayerMethod, PrayerSettings } from '../model/types';
 import { computePrayerTimes, formatMinutes, PRAYERS } from '../model/prayerTimes';
 import { WireSettings } from '../ble/prayerProtocol';
@@ -46,7 +47,6 @@ const formatOffset = (q: number) => {
 
 export function PrayerSettingsScreen({ route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
-  const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
   // Prefill: this watch's settings, else the household's most recently edited
@@ -196,11 +196,7 @@ export function PrayerSettingsScreen({ route }: Props) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag">
+    <Screen width="read">
       <Text style={styles.label}>Calculation method</Text>
       {METHOD_OPTIONS.map((option) => (
         <Pressable
@@ -254,9 +250,15 @@ export function PrayerSettingsScreen({ route }: Props) {
           testID="prayer-lon"
         />
       </View>
-      <Pressable style={styles.gpsButton} onPress={useGps} disabled={busy !== null} testID="use-gps">
-        <Text style={styles.gpsButtonText}>{busy === 'GPS' ? 'Locating…' : 'Use phone location'}</Text>
-      </Pressable>
+      <Button
+        variant="secondary"
+        label={busy === 'GPS' ? 'Locating…' : 'Use phone location'}
+        onPress={useGps}
+        disabled={busy !== null}
+        busy={busy === 'GPS'}
+        testID="use-gps"
+        style={{ marginTop: spacing(1) }}
+      />
 
       <Text style={styles.label}>UTC offset (prayer math needs it; synced from this phone)</Text>
       <View style={styles.row}>
@@ -287,22 +289,28 @@ export function PrayerSettingsScreen({ route }: Props) {
         })
       )}
 
-      <Pressable
-        style={[styles.applyButton, (!valid || busy !== null) && { opacity: 0.5 }]}
+      <Button
+        label={busy === 'Apply' ? 'Applying…' : 'Apply to watch'}
         onPress={apply}
         disabled={!valid || busy !== null}
-        testID="apply-prayer">
-        <Text style={styles.applyText}>{busy === 'Apply' ? 'Applying…' : 'Apply to watch'}</Text>
-      </Pressable>
-      <Pressable style={styles.readButton} onPress={readFromWatch} disabled={busy !== null} testID="read-prayer">
-        <Text style={styles.readText}>{busy === 'Read' ? 'Reading…' : 'Read from watch'}</Text>
-      </Pressable>
-    </ScrollView>
+        busy={busy === 'Apply'}
+        testID="apply-prayer"
+        style={{ marginTop: spacing(3) }}
+      />
+      <Button
+        variant="secondary"
+        label={busy === 'Read' ? 'Reading…' : 'Read from watch'}
+        onPress={readFromWatch}
+        disabled={busy !== null}
+        busy={busy === 'Read'}
+        testID="read-prayer"
+        style={{ marginTop: spacing(1) }}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   label: { color: colors.textDim, marginTop: spacing(2), marginBottom: spacing(1), fontSize: 13, textTransform: 'uppercase' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   inlineLabel: { color: colors.text, fontSize: 15 },
@@ -325,15 +333,6 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.accent },
   segmentText: { color: colors.textDim, fontSize: 14 },
   segmentTextActive: { color: '#fff', fontWeight: '700' },
-  gpsButton: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing(1),
-  },
-  gpsButtonText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
   stepButton: { backgroundColor: colors.card, borderRadius: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stepButtonText: { color: colors.accent, fontSize: 24, fontWeight: '700' },
   offsetValue: { color: colors.text, fontSize: 20, minWidth: 90, textAlign: 'center', fontVariant: ['tabular-nums'] },
@@ -341,15 +340,4 @@ const styles = StyleSheet.create({
   preview: { color: colors.text, fontSize: 15 },
   previewNext: { color: colors.accent, fontWeight: '700' },
   previewNone: { color: colors.warn, fontSize: 14 },
-  applyButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing(3),
-  },
-  applyText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  readButton: { alignItems: 'center', justifyContent: 'center', height: 44, marginTop: spacing(1) },
-  readText: { color: colors.textDim, fontSize: 15 },
 });

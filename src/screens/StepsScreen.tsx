@@ -1,11 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
 import { makeTransport } from '../ble/transportFactory';
 import { readStepCounts } from '../ble/syncManager';
 import { appendSteps, dateKey, getSteps, StepSample } from '../storage/stepsStore';
@@ -31,7 +31,6 @@ function windowSeries(history: StepSample[]): { date: string; steps: number; lab
 }
 
 export function StepsScreen({ route }: Props) {
-  const insets = useSafeAreaInsets();
   const { watches } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
@@ -84,7 +83,7 @@ export function StepsScreen({ route }: Props) {
   const sel = selected != null ? series[selected] : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+    <Screen width="read">
       {/* Headline */}
       <View style={styles.hero}>
         <Text style={styles.heroSteps}>{todayCount.toLocaleString()}</Text>
@@ -127,13 +126,11 @@ export function StepsScreen({ route }: Props) {
         The watch counts steps on its own; this reads today&rsquo;s total and keeps the daily history here (the watch only
         remembers today and yesterday). Refreshes each time you open this screen.
       </Text>
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-
   hero: { backgroundColor: colors.card, borderRadius: 14, padding: spacing(2.5), alignItems: 'center' },
   heroSteps: { color: colors.text, fontSize: 44, fontWeight: '800' },
   heroLabel: { color: colors.textDim, fontSize: 14, marginTop: 2 },

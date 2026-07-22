@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { Button } from '../ui/Button';
 import { showAlert } from '../ui/alert';
 import { exportText } from '../ui/exportText';
 import { BeaconConfig } from '../model/types';
@@ -20,7 +21,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Beacon'>;
 
 export function BeaconScreen({ route, navigation }: Props) {
   const { watches, upsertWatch } = useWatchStore();
-  const insets = useSafeAreaInsets();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const [busy, setBusy] = useState<string | null>(null);
   const [session, setSession] = useState<AppleSession | null>(null);
@@ -128,9 +128,7 @@ export function BeaconScreen({ route, navigation }: Props) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}>
+    <Screen width="read">
       <Text style={styles.body}>
         Find My turns this watch into an OpenHaystack beacon: nearby iPhones report its location to Apple's Find My network,
         which you retrieve on your own macless-haystack server using the exported keys. Only use it to locate your own device.
@@ -145,36 +143,33 @@ export function BeaconScreen({ route, navigation }: Props) {
       ) : (
         <Text style={styles.status}>No key yet.</Text>
       )}
-      <Pressable style={styles.secondaryButton} onPress={generate} testID="beacon-generate">
-        <Text style={styles.secondaryText}>{beacon ? 'Generate a new key' : 'Generate key'}</Text>
-      </Pressable>
+      <Button
+        variant="secondary"
+        label={beacon ? 'Generate a new key' : 'Generate key'}
+        onPress={generate}
+        testID="beacon-generate"
+      />
 
       <Text style={styles.label}>2. Put it on the watch</Text>
-      <Pressable
-        style={[styles.button, (!beacon || busy !== null) && { opacity: 0.5 }]}
+      <Button
+        label={busy === 'Provision' ? 'Writing…' : 'Provision to watch'}
         onPress={provision}
         disabled={!beacon || busy !== null}
-        testID="beacon-provision">
-        <Text style={styles.buttonText}>{busy === 'Provision' ? 'Writing…' : 'Provision to watch'}</Text>
-      </Pressable>
+        busy={busy === 'Provision'}
+        testID="beacon-provision"
+      />
 
       <Text style={styles.label}>3. Turn on (optional here; also on the watch)</Text>
-      <Pressable
-        style={[styles.button, (!beacon?.provisioned || busy !== null) && { opacity: 0.5 }]}
+      <Button
+        label={busy === 'Enable' ? 'Enabling…' : 'Turn on Find My'}
         onPress={turnOn}
         disabled={!beacon?.provisioned || busy !== null}
-        testID="beacon-enable">
-        <Text style={styles.buttonText}>{busy === 'Enable' ? 'Enabling…' : 'Turn on Find My'}</Text>
-      </Pressable>
+        busy={busy === 'Enable'}
+        testID="beacon-enable"
+      />
 
       <Text style={styles.label}>4. Export keys for your server</Text>
-      <Pressable
-        style={[styles.secondaryButton, !beacon && { opacity: 0.5 }]}
-        onPress={exportKeys}
-        disabled={!beacon}
-        testID="beacon-export">
-        <Text style={styles.secondaryText}>Export .keys file</Text>
-      </Pressable>
+      <Button variant="secondary" label="Export .keys file" onPress={exportKeys} disabled={!beacon} testID="beacon-export" />
       <Text style={styles.hint}>
         The exported file (macless-haystack format) holds the private key — keep it safe. Load it into your macless-haystack
         instance to see this watch's location.
@@ -183,13 +178,12 @@ export function BeaconScreen({ route, navigation }: Props) {
       {Platform.OS !== 'web' && (
         <>
           <Text style={styles.label}>5. Locate this watch</Text>
-          <Pressable
-            style={[styles.button, !beacon && { opacity: 0.5 }]}
+          <Button
+            label="View location on map"
             onPress={() => navigation.navigate('FindMyMap', { watchId: watch.id })}
             disabled={!beacon}
-            testID="beacon-map">
-            <Text style={styles.buttonText}>View location on map</Text>
-          </Pressable>
+            testID="beacon-map"
+          />
           {session ? (
             <View style={styles.card}>
               <Text style={styles.status}>Signed in to Apple as {session.info.accountName || session.username}</Text>
@@ -203,9 +197,7 @@ export function BeaconScreen({ route, navigation }: Props) {
               </Pressable>
             </View>
           ) : (
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin">
-              <Text style={styles.secondaryText}>Sign in to Apple</Text>
-            </Pressable>
+            <Button variant="secondary" label="Sign in to Apple" onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin" />
           )}
           <Text style={styles.hint}>
             Sign in with a burner Apple Account to pull this watch's crowd-sourced location from Apple's Find My network and
@@ -213,26 +205,16 @@ export function BeaconScreen({ route, navigation }: Props) {
           </Text>
         </>
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   body: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginBottom: spacing(1) },
   label: { color: colors.textDim, marginTop: spacing(2.5), marginBottom: spacing(1), fontSize: 13, textTransform: 'uppercase' },
   card: { backgroundColor: colors.card, borderRadius: 10, padding: spacing(1.5), marginBottom: spacing(1) },
   mono: { color: colors.text, fontSize: 12, fontVariant: ['tabular-nums'] },
   status: { color: colors.textDim, fontSize: 13, marginTop: 2 },
-  button: { backgroundColor: colors.accent, borderRadius: 12, height: 50, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  secondaryButton: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   secondaryText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
   hint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing(1) },
 });

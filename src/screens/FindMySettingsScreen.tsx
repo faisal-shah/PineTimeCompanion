@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { colors, spacing } from '../ui/theme';
+import { Screen } from '../ui/Screen';
+import { Button } from '../ui/Button';
 import { DEFAULT_MAP_STYLE_URL, getFindMySettings, saveFindMySettings } from '../storage/findMySettings';
 import { DEFAULT_ANISETTE_SERVERS } from '../findmy/apple/anisette';
 
 export function FindMySettingsScreen() {
-  const insets = useSafeAreaInsets();
   const [mapStyleUrl, setMapStyleUrl] = useState('');
   const [anisette, setAnisette] = useState('');
   const [saved, setSaved] = useState(false);
@@ -29,10 +29,7 @@ export function FindMySettingsScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: spacing(2), paddingBottom: spacing(2) + insets.bottom }}
-      keyboardShouldPersistTaps="handled">
+    <Screen width="read">
       <Text style={styles.label}>Map style URL</Text>
       <TextInput
         style={styles.input}
@@ -67,20 +64,15 @@ export function FindMySettingsScreen() {
         instance. Leave blank to use the defaults. Public servers can be down; the app falls back across them.
       </Text>
 
-      <Pressable style={styles.button} onPress={save}>
-        <Text style={styles.buttonText}>{saved ? 'Saved ✓' : 'Save'}</Text>
-      </Pressable>
-    </ScrollView>
+      <Button label={saved ? 'Saved ✓' : 'Save'} onPress={save} style={{ marginTop: spacing(3) }} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   label: { color: colors.textDim, marginBottom: spacing(0.5), fontSize: 13, textTransform: 'uppercase' },
   input: { backgroundColor: colors.card, borderRadius: 10, minHeight: 48, paddingHorizontal: spacing(1.5), paddingVertical: spacing(1), color: colors.text, fontSize: 14 },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
   hint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing(1) },
   reset: { color: colors.accent, fontSize: 14, marginTop: spacing(1), fontWeight: '600' },
-  button: { backgroundColor: colors.accent, borderRadius: 12, height: 50, alignItems: 'center', justifyContent: 'center', marginTop: spacing(3) },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
