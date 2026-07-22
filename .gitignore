@@ -53,3 +53,6 @@ modules/**/build/
 *.dmg
 *.AppImage
 *.msi
+
+# Screenshots from verification runs
+shots/
