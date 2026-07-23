@@ -17,9 +17,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
 
 // The four peer features, each with its own screen. Large, readable rows —
 // this is the watch's home hub.
-type FeatureKey = 'Schedule' | 'Alarms' | 'PrayerSettings' | 'Beacon' | 'Weather' | 'Steps' | 'Notifications' | 'Update';
+type FeatureKey = 'Schedule' | 'Tasks' | 'Alarms' | 'PrayerSettings' | 'Beacon' | 'Weather' | 'Steps' | 'Notifications' | 'Update';
 const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string }[] = [
   { key: 'Schedule', icon: '🗓️', title: 'Schedule', subtitle: 'Recurring reminders' },
+  { key: 'Tasks', icon: '✅', title: 'Daily tasks', subtitle: 'A checklist that resets each day' },
   { key: 'Alarms', icon: '⏰', title: 'Alarms', subtitle: 'Up to 5 daily or one-shot' },
   { key: 'PrayerSettings', icon: '🕌', title: 'Prayer times', subtitle: 'Five daily prayers' },
   { key: 'Beacon', icon: '📍', title: 'Find My', subtitle: 'Turn into a locator beacon' },
@@ -114,10 +115,16 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     ]);
   };
 
-  const featureSubtitle = (key: FeatureKey, fallback: string) =>
-    key === 'Schedule'
-      ? `${watch.events.length} event${watch.events.length === 1 ? '' : 's'}`
-      : fallback;
+  const featureSubtitle = (key: FeatureKey, fallback: string) => {
+    if (key === 'Schedule') {
+      return `${watch.events.length} event${watch.events.length === 1 ? '' : 's'}`;
+    }
+    if (key === 'Tasks') {
+      const n = watch.tasks?.length ?? 0;
+      return n === 0 ? fallback : `${n} task${n === 1 ? '' : 's'} · 🔥 ${watch.taskStreak ?? 0}`;
+    }
+    return fallback;
+  };
 
   return (
     <>

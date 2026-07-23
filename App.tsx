@@ -7,6 +7,7 @@ import { WatchListScreen } from './src/screens/WatchListScreen';
 import { WatchDetailScreen } from './src/screens/WatchDetailScreen';
 import { EventEditScreen } from './src/screens/EventEditScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
+import { TasksScreen } from './src/screens/TasksScreen';
 import { WatchPairScreen } from './src/screens/WatchPairScreen';
 import { PrayerSettingsScreen } from './src/screens/PrayerSettingsScreen';
 import { AlarmsScreen } from './src/screens/AlarmsScreen';
@@ -38,6 +39,7 @@ export default function App() {
           <Stack.Screen name="WatchList" component={WatchListScreen} options={{ title: 'PineTime Companion' }} />
           <Stack.Screen name="WatchDetail" component={WatchDetailScreen} options={{ title: 'Watch' }} />
           <Stack.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Schedule' }} />
+          <Stack.Screen name="Tasks" component={TasksScreen} options={{ title: 'Daily tasks' }} />
           <Stack.Screen name="EventEdit" component={EventEditScreen} options={{ title: 'Event' }} />
           <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
           <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
