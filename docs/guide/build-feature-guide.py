@@ -136,6 +136,26 @@ for i, (title, sub, (wi, wc), (pi, pc), bullets) in enumerate(FLAG[:6]):
         parts.append('</section><section class="page">')
 parts.append('</section>')
 
+# DAILY TASKS gets its own page (two watch views + the phone editor).
+parts.append(f"""
+<section class="page">
+  <div class="section-tag">Flagship features</div>
+  <h2>Daily tasks &mdash; a checklist that resets every day</h2>
+  <p class="lead">A fixed daily routine you build on the phone and tick off on the wrist. The watch shows how many are done today with a progress ring and a streak; everything un-checks at midnight.</p>
+  <div class="row center gap">
+    {watch("watch-tasks-summary.png", "Watch → today's progress + streak")}
+    {watch("watch-tasks-list.png", "Watch → tap a row to tick it off")}
+    {phone("companion-tasks.png", "Companion → edit the daily list")}
+  </div>
+  <div class="note">
+    <b>Built on the phone, ticked on the wrist.</b> Add, rename, reorder and delete tasks from the companion (up to 20). The list syncs to the watch, where the wearer only ticks them off &mdash; no fiddly editing on the tiny screen. Ticks live <b>only on the watch</b> and clear at local midnight, so every day starts fresh.
+  </div>
+  <div class="note">
+    <b>Streaks keep it going.</b> Finish every task in a day and the watch bumps a streak counter at midnight; miss one and it resets to zero. The streak shows on the watch summary, and the phone can read it or set it directly &mdash; forgive a missed day, or hand out a reward. Like the schedule, the list is watch-authoritative: edits from a second phone merge instead of clobbering.
+  </div>
+</section>
+""")
+
 # The OTA feature gets its own deep-dive page.
 t, s, (wi, wc), (pi, pc), bullets = FLAG[6]
 parts.append(f"""
