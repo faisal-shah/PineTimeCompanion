@@ -2,7 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext } from 'react';
-import { Watch, WatchEvent } from '../model/types';
+import { Watch, WatchEvent, WatchTask } from '../model/types';
 
 const STORAGE_KEY = 'pinetime-companion/watches/v1';
 
@@ -25,6 +25,8 @@ export function newWatch(name: string): Watch {
     name,
     scheduleVersion: 1,
     events: [],
+    tasks: [],
+    taskVersion: 1,
   };
 }
 
@@ -41,6 +43,22 @@ export function newEventId(watch: Watch): number {
 /** Any schedule edit bumps the version so the watch digest goes stale. */
 export function withEvents(watch: Watch, events: WatchEvent[]): Watch {
   return { ...watch, events, scheduleVersion: watch.scheduleVersion + 1 };
+}
+
+/** Random 16-bit ids so tasks created on different phones never collide. */
+export function newTaskId(watch: Watch): number {
+  const tasks = watch.tasks ?? [];
+  for (;;) {
+    const id = 1 + Math.floor(Math.random() * 0xfffe);
+    if (!tasks.some((t) => t.id === id)) {
+      return id;
+    }
+  }
+}
+
+/** Any task edit bumps the task version so the watch digest goes stale. */
+export function withTasks(watch: Watch, tasks: WatchTask[]): Watch {
+  return { ...watch, tasks, taskVersion: (watch.taskVersion ?? 1) + 1 };
 }
 
 export interface WatchStore {

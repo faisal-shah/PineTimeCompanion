@@ -24,6 +24,11 @@ export const BRIDGE_CHAR = {
   weather: 14, // 00050001 write (SimpleWeatherService: current + forecast)
   steps: 15, // 00030001 read (MotionService: today's cumulative step count)
   stepsYesterday: 16, // 00030003 read (MotionService: yesterday's total)
+  // 17..29 are MusicService/call-event chars, addressed only from the native
+  // Kotlin module (WatchChar) and Node e2e scripts, so they're not in this map.
+  tasksSync: 30, // 00070001 write (TaskService: begin/record/commit/abort/setStreak)
+  tasksDigest: 31, // 00070002 read (protoVer, capacity, count, version, streak)
+  taskRead: 32, // 00070003 write index -> read one task record
 } as const;
 
 export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];

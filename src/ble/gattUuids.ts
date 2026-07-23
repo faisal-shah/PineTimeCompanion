@@ -11,6 +11,7 @@ import { BEACON_SERVICE_UUID, BEACON_KEY_CHAR_UUID, BEACON_CONTROL_CHAR_UUID } f
 import { MULTIALARM_SERVICE_UUID, MULTIALARM_CHAR_UUID } from './multiAlarmProtocol';
 import { WEATHER_SERVICE_UUID, WEATHER_CHAR_UUID } from './weatherProtocol';
 import { MOTION_SERVICE_UUID, STEP_COUNT_CHAR_UUID, STEP_COUNT_YESTERDAY_CHAR_UUID } from './stepsProtocol';
+import { TASK_SERVICE_UUID, TASK_SYNC_CHAR_UUID, TASK_DIGEST_CHAR_UUID, TASK_READ_CHAR_UUID } from './tasksProtocol';
 
 // Standard GATT services the companion basics use.
 const CTS_SERVICE = '00001805-0000-1000-8000-00805f9b34fb';
@@ -49,6 +50,9 @@ export const CHAR_MAP: Record<BridgeCharId, { service: string; characteristic: s
   [BRIDGE_CHAR.weather]: { service: WEATHER_SERVICE_UUID, characteristic: WEATHER_CHAR_UUID, withResponse: true },
   [BRIDGE_CHAR.steps]: { service: MOTION_SERVICE_UUID, characteristic: STEP_COUNT_CHAR_UUID, withResponse: true },
   [BRIDGE_CHAR.stepsYesterday]: { service: MOTION_SERVICE_UUID, characteristic: STEP_COUNT_YESTERDAY_CHAR_UUID, withResponse: true },
+  [BRIDGE_CHAR.tasksSync]: { service: TASK_SERVICE_UUID, characteristic: TASK_SYNC_CHAR_UUID, withResponse: true },
+  [BRIDGE_CHAR.tasksDigest]: { service: TASK_SERVICE_UUID, characteristic: TASK_DIGEST_CHAR_UUID, withResponse: true },
+  [BRIDGE_CHAR.taskRead]: { service: TASK_SERVICE_UUID, characteristic: TASK_READ_CHAR_UUID, withResponse: true },
 };
 
 // The DFU service is on the Web Bluetooth GATT blocklist; requesting it in
