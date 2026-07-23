@@ -7,10 +7,11 @@
 import { WatchTask } from '../model/types';
 import { encodeTitle, TITLE_BYTES } from './scheduleProtocol';
 
-export const TASK_SERVICE_UUID = '00070000-78fc-48fe-8e23-433b3a1942d0';
-export const TASK_SYNC_CHAR_UUID = '00070001-78fc-48fe-8e23-433b3a1942d0';
-export const TASK_DIGEST_CHAR_UUID = '00070002-78fc-48fe-8e23-433b3a1942d0';
-export const TASK_READ_CHAR_UUID = '00070003-78fc-48fe-8e23-433b3a1942d0';
+// Service byte 0x0a — 0x07 (00070000) is already the Prayer service.
+export const TASK_SERVICE_UUID = '000a0000-78fc-48fe-8e23-433b3a1942d0';
+export const TASK_SYNC_CHAR_UUID = '000a0001-78fc-48fe-8e23-433b3a1942d0';
+export const TASK_DIGEST_CHAR_UUID = '000a0002-78fc-48fe-8e23-433b3a1942d0';
+export const TASK_READ_CHAR_UUID = '000a0003-78fc-48fe-8e23-433b3a1942d0';
 
 export const PROTOCOL_VERSION = 1;
 export const TASK_RECORD_SIZE = 31; // [id u16][order u8][title 24][lastModified u32]
