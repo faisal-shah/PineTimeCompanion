@@ -1,7 +1,17 @@
 // Transport-agnostic sync + companion functions. All logic lives here, above
 // the WatchTransport seam, so the whole flow is emulator-testable.
 
-import { SyncBase, Watch, WatchEvent } from '../model/types';
+import { SyncBase, TaskSyncBase, Watch, WatchEvent, WatchTask } from '../model/types';
+import { looksLikeTaskReset, mergeTasks } from '../model/tasksMerge';
+import {
+  decodeTaskDigest,
+  decodeTaskRecord,
+  encodeAbortSync as encodeTaskAbort,
+  encodeBeginSync as encodeTaskBegin,
+  encodeCommitSync as encodeTaskCommit,
+  encodeSetStreak,
+  encodeTaskMessage,
+} from './tasksProtocol';
 import { decodePrayerSettings, encodePrayerSettings, WireSettings } from './prayerProtocol';
 import { CurrentWeather, encodeCurrentWeather, encodeForecast, ForecastDay } from './weatherProtocol';
 import { decodeStepCount } from './stepsProtocol';
@@ -134,6 +144,133 @@ export async function syncWatch(transport: WatchTransport, watch: Watch, acceptW
       notices: result.notices,
       capacity: digest.capacity,
     };
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+// ---- Daily task checklist sync (the twin of the schedule sync above) ----
+
+export class TaskResetError extends TransportError {
+  constructor() {
+    super('the watch task list is empty but this device has synced before');
+    this.name = 'TaskResetError';
+  }
+}
+
+export interface SyncTasksResult {
+  skipped: boolean;
+  tasks: WatchTask[];
+  base: TaskSyncBase;
+  notices: MergeNotice[];
+  capacity: number;
+  /** the streak the watch reports (the app displays it; may later override it) */
+  streak: number;
+}
+
+async function pullTasks(transport: WatchTransport, count: number): Promise<WatchTask[]> {
+  const out: WatchTask[] = [];
+  for (let i = 0; i < count; i++) {
+    await transport.write(BRIDGE_CHAR.taskRead, new Uint8Array([i]));
+    out.push(decodeTaskRecord(await transport.read(BRIDGE_CHAR.taskRead)));
+  }
+  return out;
+}
+
+async function pushTasks(transport: WatchTransport, tasks: WatchTask[], version: number): Promise<void> {
+  try {
+    await transport.write(BRIDGE_CHAR.tasksSync, encodeTaskBegin(tasks.length, version));
+    for (const [index, task] of tasks.entries()) {
+      await transport.write(BRIDGE_CHAR.tasksSync, encodeTaskMessage(index, task));
+    }
+    await transport.write(BRIDGE_CHAR.tasksSync, encodeTaskCommit(tasks.length));
+  } catch (e) {
+    await transport.write(BRIDGE_CHAR.tasksSync, encodeTaskAbort()).catch(() => undefined);
+    throw e;
+  }
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await new Promise((r) => setTimeout(r, 150));
+    const digest = decodeTaskDigest(await transport.read(BRIDGE_CHAR.tasksDigest));
+    if (digest.taskVersion === version && digest.count === tasks.length) {
+      return;
+    }
+  }
+  throw new TransportError('watch did not confirm the task sync');
+}
+
+/**
+ * Multi-companion sync of the task DEFINITIONS (title/order), mirroring
+ * syncWatch: read the task digest, three-way merge against the last base, push.
+ * The streak is read from the digest and returned (completion itself never
+ * crosses — it lives only on the watch). `acceptWatchReset` works like syncWatch.
+ */
+export async function syncTasks(transport: WatchTransport, watch: Watch, acceptWatchReset = false): Promise<SyncTasksResult> {
+  if (!watch.deviceId) {
+    throw new TransportError('watch is not paired');
+  }
+  const mine = watch.tasks ?? [];
+  await transport.connect(watch.deviceId);
+  try {
+    const mtu = await transport.requestMtu(256);
+    if (mtu < MIN_MTU) {
+      throw new TransportError(`negotiated MTU ${mtu} is too small to sync (need >= ${MIN_MTU})`);
+    }
+
+    const digest = decodeTaskDigest(await transport.read(BRIDGE_CHAR.tasksDigest));
+    const base = watch.taskSyncBase;
+    const nobodyElseWrote = base !== undefined && digest.taskVersion === base.version;
+
+    let theirs: WatchTask[];
+    if (nobodyElseWrote) {
+      theirs = base.tasks;
+    } else {
+      theirs = await pullTasks(transport, digest.count);
+      if (!acceptWatchReset && looksLikeTaskReset(theirs, digest.taskVersion, base)) {
+        throw new TaskResetError();
+      }
+    }
+
+    const result = mergeTasks(mine, theirs, acceptWatchReset ? undefined : base);
+
+    if (result.merged.length > digest.capacity) {
+      throw new TransportError(
+        `merged task list has ${result.merged.length} tasks but the watch holds at most ${digest.capacity}; delete some and sync again`,
+      );
+    }
+
+    if (!result.needsPush && nobodyElseWrote && !result.changedLocally) {
+      return { skipped: true, tasks: result.merged, base, notices: [], capacity: digest.capacity, streak: digest.streak };
+    }
+
+    const version = randomVersion();
+    await pushTasks(transport, result.merged, version);
+    return {
+      skipped: false,
+      tasks: result.merged,
+      base: { version, syncedAt: Math.floor(Date.now() / 1000), tasks: result.merged },
+      notices: result.notices,
+      capacity: digest.capacity,
+      streak: digest.streak,
+    };
+  } finally {
+    await transport.disconnect().catch(() => undefined);
+  }
+}
+
+/** Override the watch's streak counter (parent forgives a missed day / sets a reward). */
+export async function setTaskStreak(transport: WatchTransport, deviceId: string, streak: number): Promise<void> {
+  await transport.connect(deviceId);
+  try {
+    await transport.write(BRIDGE_CHAR.tasksSync, encodeSetStreak(streak));
+    // confirm by read-back
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise((r) => setTimeout(r, 150));
+      const digest = decodeTaskDigest(await transport.read(BRIDGE_CHAR.tasksDigest));
+      if (digest.streak === (streak & 0xffff)) {
+        return;
+      }
+    }
+    throw new TransportError('watch did not confirm the streak change');
   } finally {
     await transport.disconnect().catch(() => undefined);
   }

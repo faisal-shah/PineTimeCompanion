@@ -60,6 +60,30 @@ export interface SyncBase {
   events: WatchEvent[];
 }
 
+/**
+ * One item in the daily task checklist. Phone-edited, watch-authoritative,
+ * three-way merged across phones like WatchEvent — but a task has no time or
+ * recurrence (it's a fixed daily routine). Per-task completion lives ONLY on the
+ * watch (resets at midnight) and is never part of this record, so it can't
+ * create merge conflicts.
+ */
+export interface WatchTask {
+  /** random 16-bit id, unique per watch across ALL companions */
+  id: number;
+  title: string; // shown on the watch; truncated to 23 UTF-8 bytes on sync
+  /** display order (0..255); the watch lists tasks by it */
+  order: number;
+  /** UNIX seconds (UTC) of the last edit on any companion; drives merge conflicts */
+  lastModified: number;
+}
+
+/** The task-list equivalent of SyncBase — last successful task sync snapshot. */
+export interface TaskSyncBase {
+  version: number;
+  syncedAt: number;
+  tasks: WatchTask[];
+}
+
 /** Per-watch FindMy beacon config. Only advertisementKeyB64 goes to the watch. */
 export interface BeaconConfig {
   /**
@@ -97,6 +121,20 @@ export interface Watch {
   /** Forward phone notifications to this watch (Android only, persistent link). */
   forwardNotifications?: boolean;
   events: WatchEvent[];
+
+  // --- Daily task checklist (mirrors the schedule sync fields) ---
+  /** the day's tasks; phone-edited, watch-authoritative */
+  tasks?: WatchTask[];
+  /** monotonically increasing; bumped on every task edit (like scheduleVersion) */
+  taskVersion?: number;
+  /** task version last confirmed on the watch */
+  taskSyncedVersion?: number;
+  /** last successful task-sync snapshot; absent until the first task sync */
+  taskSyncBase?: TaskSyncBase;
+  /** task slots on the watch, from its task digest */
+  taskCapacity?: number;
+  /** consecutive all-done-days streak, read from the watch; the app may override it */
+  taskStreak?: number;
 }
 
 export const RULE_KIND_CODES: Record<RuleKind, number> = {

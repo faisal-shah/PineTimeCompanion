@@ -96,11 +96,19 @@ const events = [
   { id: 8765, title: 'Quran practice', hour: 19, minute: 30, anchorDate: today, rule: { kind: 'weekly', weekdayMask: 0b0101010 }, enabled: true, lastModified: nowSec },
   { id: 2244, title: 'Take medicine', hour: 9, minute: 0, anchorDate: today, rule: { kind: 'monthly', dayOfMonth: 1 }, enabled: false, lastModified: nowSec },
 ];
+const tasks = [
+  { id: 11, title: 'Fajr prayer', order: 0, lastModified: nowSec * 1000 },
+  { id: 12, title: 'Brush teeth', order: 1, lastModified: nowSec * 1000 },
+  { id: 13, title: 'Make bed', order: 2, lastModified: nowSec * 1000 },
+  { id: 14, title: 'Read 10 minutes', order: 3, lastModified: nowSec * 1000 },
+  { id: 15, title: 'Water the plants', order: 4, lastModified: nowSec * 1000 },
+];
 const mkWatch = (id, name, battery) => ({
   id, name, deviceId: 'localhost:18633', scheduleVersion: 3, syncedVersion: 3,
   lastSyncAt: new Date().toISOString(), batteryPercent: battery, capacity: 64,
   prayerSettings: { method: 'ummAlQura', asrMadhab: 'standard', alertsEnabled: true, latE2: 2142, lonE2: 3983, utcOffsetQuarters: 12, editedAt: nowSec },
   forwardNotifications: false, events,
+  tasks, taskVersion: 4, taskSyncedVersion: 4, taskCapacity: 20, taskStreak: 12,
 });
 const watches = [mkWatch('w1', 'My PineTime', 82), mkWatch('w2', "Layla's watch", 47)];
 const stepDays = [6200, 8100, 10400, 4300, 9700, 12500, 7600, 9100, 11200, 5400, 8800, 10100, 9500, 7500];
@@ -115,6 +123,7 @@ const SCREENS = [
   ['watchlist', []],
   ['watchdetail', [{ sel: '[data-testid="watch-My PineTime"]', wait: '[data-testid="feature-Schedule"]' }]],
   ['schedule', [{ sel: '[data-testid="watch-My PineTime"]', wait: '[data-testid="feature-Schedule"]' }, { sel: '[data-testid="feature-Schedule"]', wait: '[data-testid="sync-watch"]' }]],
+  ['tasks', [{ sel: '[data-testid="watch-My PineTime"]', wait: '[data-testid="feature-Tasks"]' }, { sel: '[data-testid="feature-Tasks"]', wait: '[data-testid="sync-tasks"]' }]],
   ['eventedit', [{ sel: '[data-testid="watch-My PineTime"]', wait: '[data-testid="feature-Schedule"]' }, { sel: '[data-testid="feature-Schedule"]', wait: '[data-testid="add-event"]' }, { sel: '[data-testid="add-event"]', wait: '[data-testid="save-event"]' }]],
   ['prayer', [{ sel: '[data-testid="watch-My PineTime"]', wait: '[data-testid="feature-PrayerSettings"]' }, { sel: '[data-testid="feature-PrayerSettings"]', wait: '[data-testid="apply-prayer"]' }]],
   ['weather', [{ sel: '[data-testid="watch-My PineTime"]', wait: '[data-testid="feature-Weather"]' }, { sel: '[data-testid="feature-Weather"]', wait: '[data-testid="weather-update"]' }]],
