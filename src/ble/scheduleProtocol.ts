@@ -1,9 +1,20 @@
-// Byte-level encoders/decoders for the InfiniTime Schedule Service
-// (doc/ScheduleService.md in the InfiniTime fork). Pure functions over
-// Uint8Array — no BLE, no React Native — tested against the golden vectors
-// with `node --test` (scheduleProtocol.test.ts).
+// Byte-level encoder/decoder for the InfiniTime Schedule Service's per-event
+// record + digest (doc/ScheduleService.md in the InfiniTime fork). The sync
+// command framing + digest header are shared across every list service and live
+// in listProtocol.ts. Pure functions — golden-tested in scheduleProtocol.test.ts.
 
 import { EventRule, WatchEvent, RULE_KIND_CODES, ruleParamByte } from '../model/types';
+import {
+  ListDigest,
+  decodeListDigest,
+  decodeTitle,
+  encodeRecordMessage,
+  encodeTitle,
+  u16le,
+  u16leAt,
+  u32le,
+  u32leAt,
+} from './listProtocol';
 
 export const SCHEDULE_SERVICE_UUID = '00060000-78fc-48fe-8e23-433b3a1942d0';
 export const SYNC_COMMAND_CHAR_UUID = '00060001-78fc-48fe-8e23-433b3a1942d0';
@@ -13,28 +24,7 @@ export const EVENT_READ_CHAR_UUID = '00060003-78fc-48fe-8e23-433b3a1942d0';
 export const PROTOCOL_VERSION = 1;
 
 export const EVENT_RECORD_SIZE = 39;
-export const TITLE_BYTES = 23; // 24-byte field, last byte always NUL
-
-function u16le(value: number): [number, number] {
-  return [value & 0xff, (value >> 8) & 0xff];
-}
-
-function u32le(value: number): [number, number, number, number] {
-  return [value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff];
-}
-
-/** UTF-8 encode and truncate WITHOUT splitting a multi-byte character. */
-export function encodeTitle(title: string): Uint8Array {
-  const full = new TextEncoder().encode(title);
-  if (full.length <= TITLE_BYTES) {
-    return full;
-  }
-  let end = TITLE_BYTES;
-  while (end > 0 && (full[end] & 0xc0) === 0x80) {
-    end--; // don't cut inside a UTF-8 continuation sequence
-  }
-  return full.subarray(0, end);
-}
+export const SCHEDULE_DIGEST_SIZE = 7;
 
 export function encodeEventRecord(event: WatchEvent): Uint8Array {
   const record = new Uint8Array(EVENT_RECORD_SIZE); // zero-filled: title NUL padding
@@ -72,57 +62,23 @@ export function decodeEventRecord(record: Uint8Array): WatchEvent {
         : kind === 'weekly'
           ? { kind, weekdayMask: param & 0x7f }
           : { kind, dayOfMonth: Math.min(31, Math.max(1, param)) };
-  const titleBytes = record.subarray(11, 35);
-  const nul = titleBytes.indexOf(0);
-  const year = record[5] | (record[6] << 8);
+  const year = u16leAt(record, 5);
   return {
-    id: record[0] | (record[1] << 8),
+    id: u16leAt(record, 0),
     rule,
     hour: record[3],
     minute: record[4],
     anchorDate: `${year}-${String(record[7]).padStart(2, '0')}-${String(record[8]).padStart(2, '0')}`,
     enabled: (record[10] & 0x01) !== 0,
-    title: new TextDecoder().decode(nul >= 0 ? titleBytes.subarray(0, nul) : titleBytes),
-    lastModified: (record[35] | (record[36] << 8) | (record[37] << 16) | (record[38] << 24)) >>> 0,
+    title: decodeTitle(record.subarray(11, 35)),
+    lastModified: u32leAt(record, 35),
   };
-}
-
-export function encodeBeginSync(count: number, version: number): Uint8Array {
-  return new Uint8Array([0x00, 0x00, count, ...u32le(version)]);
 }
 
 export function encodeEventMessage(index: number, event: WatchEvent): Uint8Array {
-  const msg = new Uint8Array(3 + EVENT_RECORD_SIZE);
-  msg[0] = 0x01;
-  msg[1] = 0x01; // EventRecord message version (39-byte records)
-  msg[2] = index;
-  msg.set(encodeEventRecord(event), 3);
-  return msg;
+  return encodeRecordMessage(index, encodeEventRecord(event));
 }
 
-export function encodeCommitSync(count: number): Uint8Array {
-  return new Uint8Array([0x02, 0x00, count]);
-}
-
-export function encodeAbortSync(): Uint8Array {
-  return new Uint8Array([0x03, 0x00]);
-}
-
-export interface Digest {
-  protocolVersion: number;
-  capacity: number;
-  count: number;
-  scheduleVersion: number;
-}
-
-export function decodeDigest(payload: Uint8Array): Digest {
-  if (payload.length !== 7) {
-    throw new Error(`digest must be 7 bytes, got ${payload.length}`);
-  }
-  return {
-    protocolVersion: payload[0],
-    capacity: payload[1],
-    count: payload[2],
-    scheduleVersion: (payload[3] | (payload[4] << 8) | (payload[5] << 16) | (payload[6] << 24)) >>> 0,
-  };
+export function decodeDigest(payload: Uint8Array): ListDigest {
+  return decodeListDigest(payload, SCHEDULE_DIGEST_SIZE);
 }

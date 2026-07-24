@@ -17,8 +17,10 @@
 
 import net from 'node:net';
 import { execFileSync } from 'node:child_process';
-import { encodeBeginSync, encodeTaskMessage, encodeCommitSync, decodeTaskDigest } from '../src/ble/tasksProtocol.ts';
-import { encodeCurrentTime, setTaskStreak } from '../src/ble/syncManager.ts';
+import { encodeTaskMessage, decodeTaskDigest } from '../src/ble/tasksProtocol.ts';
+import { encodeBeginSync, encodeCommitSync } from '../src/ble/listProtocol.ts';
+import { encodeCurrentTime } from '../src/ble/syncManager.ts';
+import { setTaskStreak } from '../src/ble/listSyncManager.ts';
 import { BRIDGE_CHAR } from '../src/ble/transport.ts';
 
 const PORT = 18632;

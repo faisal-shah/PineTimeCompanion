@@ -3,17 +3,19 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'r
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
-import { useWatchStore, withTasks, newTaskId } from '../storage/store';
+import { useWatchStore } from '../storage/store';
 import { WatchTask } from '../model/types';
+import { needsSync as listNeedsSync, newItemId, syncedList, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { useCapStyle } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
 import { makeTransport } from '../ble/transportFactory';
-import { TaskResetError, syncTasks, setTaskStreak } from '../ble/syncManager';
+import { ListResetError, syncTasks, setTaskStreak } from '../ble/listSyncManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Tasks'>;
 
 const MAX_TITLE = 23; // 24-byte on-watch field, NUL-terminated
+const nowSec = () => Math.floor(Date.now() / 1000); // lastModified is UNIX seconds (like the sync base)
 
 export function TasksScreen({ route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
@@ -31,13 +33,13 @@ export function TasksScreen({ route }: Props) {
     return null;
   }
 
-  const tasks = [...(watch.tasks ?? [])].sort((a, b) => a.order - b.order || a.id - b.id);
-  const capacity = watch.taskCapacity ?? 20;
+  const tasks = [...watch.tasks.items].sort((a, b) => a.order - b.order || a.id - b.id);
+  const capacity = watch.tasks.capacity ?? 20;
   const atCapacity = tasks.length >= capacity;
-  const needsSync = watch.taskSyncBase === undefined || (watch.taskVersion ?? 1) !== watch.taskSyncBase.version;
+  const needsSync = listNeedsSync(watch.tasks);
   const streak = watch.taskStreak ?? 0;
 
-  const save = (next: WatchTask[]) => upsertWatch(withTasks(watch, next));
+  const save = (next: WatchTask[]) => upsertWatch({ ...watch, tasks: withItems(watch.tasks, next) });
 
   const addTask = () => {
     const title = newTitle.trim();
@@ -49,14 +51,14 @@ export function TasksScreen({ route }: Props) {
       return;
     }
     const order = tasks.length ? Math.max(...tasks.map((t) => t.order)) + 1 : 0;
-    save([...tasks, { id: newTaskId(watch), title: title.slice(0, MAX_TITLE), order, lastModified: Date.now() }]);
+    save([...tasks, { id: newItemId(watch.tasks.items), title: title.slice(0, MAX_TITLE), order, lastModified: nowSec() }]);
     setNewTitle('');
   };
 
   const commitRename = () => {
     const title = editText.trim();
     if (editing && title) {
-      save(tasks.map((t) => (t.id === editing.id ? { ...t, title: title.slice(0, MAX_TITLE), lastModified: Date.now() } : t)));
+      save(tasks.map((t) => (t.id === editing.id ? { ...t, title: title.slice(0, MAX_TITLE), lastModified: nowSec() } : t)));
     }
     setEditing(null);
   };
@@ -76,7 +78,7 @@ export function TasksScreen({ route }: Props) {
     }
     const a = tasks[index];
     const b = tasks[j];
-    const now = Date.now();
+    const now = nowSec();
     save(
       tasks.map((t) => {
         if (t.id === a.id) return { ...t, order: b.order, lastModified: now };
@@ -89,18 +91,14 @@ export function TasksScreen({ route }: Props) {
   const applySync = (result: Awaited<ReturnType<typeof syncTasks>>) => {
     upsertWatch({
       ...watch,
-      tasks: result.tasks,
-      taskVersion: result.base.version,
-      taskSyncedVersion: result.base.version,
-      taskSyncBase: result.base,
-      taskCapacity: result.capacity,
-      taskStreak: result.streak,
+      tasks: syncedList(result.base, result.digest.capacity),
+      taskStreak: result.digest.streak,
       lastSyncAt: new Date().toISOString(),
     });
     if (result.notices.length > 0) {
       showAlert('Merged changes from another device', result.notices.map((n) => `• ${n.title}: ${n.detail}`).join('\n'));
     } else {
-      showAlert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.tasks.length} tasks on the watch · streak ${result.streak}.`);
+      showAlert('Synced', result.skipped ? 'Watch was already up to date.' : `${result.base.items.length} tasks on the watch · streak ${result.digest.streak}.`);
     }
   };
 
@@ -114,12 +112,13 @@ export function TasksScreen({ route }: Props) {
     try {
       applySync(await syncTasks(makeTransport(deviceId), watch));
     } catch (e) {
-      if (e instanceof TaskResetError) {
+      if (e instanceof ListResetError) {
+        const empty = { ...watch, tasks: { ...watch.tasks, items: [] } };
         showAlert('Watch looks new or reset', 'Its task list is empty but this phone has synced with it before. Restore this phone’s tasks to the watch?', [
           {
             text: 'Start fresh (keep watch empty)',
             style: 'destructive',
-            onPress: () => void syncTasks(makeTransport(deviceId), { ...watch, tasks: [] }, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)),
+            onPress: () => void syncTasks(makeTransport(deviceId), empty, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)),
           },
           {
             text: 'Restore from this phone',

@@ -117,10 +117,11 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   const featureSubtitle = (key: FeatureKey, fallback: string) => {
     if (key === 'Schedule') {
-      return `${watch.events.length} event${watch.events.length === 1 ? '' : 's'}`;
+      const n = watch.schedule.items.length;
+      return `${n} event${n === 1 ? '' : 's'}`;
     }
     if (key === 'Tasks') {
-      const n = watch.tasks?.length ?? 0;
+      const n = watch.tasks.items.length;
       return n === 0 ? fallback : `${n} task${n === 1 ? '' : 's'} · 🔥 ${watch.taskStreak ?? 0}`;
     }
     return fallback;

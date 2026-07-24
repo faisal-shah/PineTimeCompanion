@@ -1,16 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  TASK_RECORD_SIZE,
-  TASK_DIGEST_SIZE,
-  decodeTaskDigest,
-  decodeTaskRecord,
-  encodeBeginSync,
-  encodeCommitSync,
-  encodeSetStreak,
-  encodeTaskMessage,
-  encodeTaskRecord,
-} from './tasksProtocol';
+import { TASK_RECORD_SIZE, TASK_DIGEST_SIZE, decodeTaskDigest, decodeTaskRecord, encodeSetStreak, encodeTaskMessage, encodeTaskRecord } from './tasksProtocol';
+import { encodeBeginSync, encodeCommitSync } from './listProtocol';
 import { WatchTask } from '../model/types';
 
 const task = (over: Partial<WatchTask> = {}): WatchTask => ({
@@ -58,7 +49,7 @@ test('sync command frames', () => {
 
 test('digest decodes protoVer/capacity/count/version/streak (9 bytes)', () => {
   const d = decodeTaskDigest(new Uint8Array([1, 20, 5, 0x04, 0x03, 0x02, 0x01, 0x0c, 0x01]));
-  assert.deepEqual(d, { protocolVersion: 1, capacity: 20, count: 5, taskVersion: 0x01020304, streak: 0x010c });
+  assert.deepEqual(d, { protocolVersion: 1, capacity: 20, count: 5, version: 0x01020304, streak: 0x010c });
   assert.equal(TASK_DIGEST_SIZE, 9);
   assert.throws(() => decodeTaskDigest(new Uint8Array(8)), /9 bytes/);
 });

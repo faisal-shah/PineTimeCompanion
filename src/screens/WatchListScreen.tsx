@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
 import { newWatch, useWatchStore } from '../storage/store';
+import { needsSync } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { CardGrid } from '../ui/CardGrid';
 import { useCapStyle } from '../ui/Screen';
@@ -18,10 +19,10 @@ function syncStatus(watch: Watch): { label: string; color: string } {
   if (!watch.deviceId) {
     return { label: 'not paired', color: colors.textDim };
   }
-  if (watch.syncedVersion === watch.scheduleVersion) {
-    return { label: `synced ${watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleString() : ''}`, color: colors.accent };
+  if (needsSync(watch.schedule) || needsSync(watch.tasks)) {
+    return { label: 'changes not synced', color: colors.warn };
   }
-  return { label: 'changes not synced', color: colors.warn };
+  return { label: `synced ${watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleString() : ''}`, color: colors.accent };
 }
 
 export function WatchListScreen({ navigation }: Props) {
@@ -70,7 +71,7 @@ export function WatchListScreen({ navigation }: Props) {
                   <View style={styles.cardRight}>
                     {item.batteryPercent !== undefined && <Text style={styles.battery}>{item.batteryPercent}%</Text>}
                     <Text style={styles.eventCount}>
-                      {item.events.length}/{item.capacity ?? 64} events
+                      {item.schedule.items.length}/{item.schedule.capacity ?? 64} events
                     </Text>
                   </View>
                 </Pressable>
