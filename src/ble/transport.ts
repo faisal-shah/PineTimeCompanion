@@ -69,7 +69,7 @@ export class TransportError extends Error {
 export async function withConnection<T>(
   transport: WatchTransport,
   deviceId: string,
-  fn: (transport: WatchTransport) => Promise<T>,
+  fn: () => Promise<T>,
   mtu?: number,
 ): Promise<T> {
   await transport.connect(deviceId);
@@ -77,7 +77,7 @@ export async function withConnection<T>(
     if (mtu !== undefined) {
       await transport.requestMtu(mtu);
     }
-    return await fn(transport);
+    return await fn();
   } finally {
     await transport.disconnect().catch(() => undefined);
   }

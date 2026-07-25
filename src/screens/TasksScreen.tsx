@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -9,6 +9,8 @@ import { needsSync as listNeedsSync, newItemId, syncedList, withItems } from '..
 import { colors, spacing } from '../ui/theme';
 import { useCapStyle } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
+import { TextPrompt } from '../ui/Dialog';
+import { useWatchOp } from '../ui/useWatchOp';
 import { makeTransport } from '../ble/transportFactory';
 import { ListResetError, syncTasks, setTaskStreak } from '../ble/listSyncManager';
 
@@ -20,7 +22,7 @@ const nowSec = () => Math.floor(Date.now() / 1000); // lastModified is UNIX seco
 export function TasksScreen({ route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
-  const [busy, setBusy] = useState(false);
+  const op = useWatchOp(watch);
   const [newTitle, setNewTitle] = useState('');
   const [editing, setEditing] = useState<WatchTask | null>(null);
   const [editText, setEditText] = useState('');
@@ -102,53 +104,33 @@ export function TasksScreen({ route }: Props) {
     }
   };
 
-  const doSync = async () => {
-    if (!watch.deviceId) {
-      showAlert('Not paired', 'Pair this watch first (from the watch screen).');
-      return;
-    }
-    const deviceId = watch.deviceId;
-    setBusy(true);
-    try {
-      applySync(await syncTasks(makeTransport(deviceId), watch));
-    } catch (e) {
-      if (e instanceof ListResetError) {
+  const doSync = () =>
+    op.run(
+      'Sync',
+      async (deviceId) => applySync(await syncTasks(makeTransport(deviceId), watch)),
+      (e) => {
+        if (!(e instanceof ListResetError)) {
+          showAlert('Sync failed', (e as Error).message);
+          return;
+        }
+        const deviceId = watch.deviceId!;
         const empty = { ...watch, tasks: { ...watch.tasks, items: [] } };
+        const restore = (from: typeof watch) =>
+          void syncTasks(makeTransport(deviceId), from, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message));
         showAlert('Watch looks new or reset', 'Its task list is empty but this phone has synced with it before. Restore this phone’s tasks to the watch?', [
-          {
-            text: 'Start fresh (keep watch empty)',
-            style: 'destructive',
-            onPress: () => void syncTasks(makeTransport(deviceId), empty, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)),
-          },
-          {
-            text: 'Restore from this phone',
-            onPress: () => void syncTasks(makeTransport(deviceId), watch, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)),
-          },
+          { text: 'Start fresh (keep watch empty)', style: 'destructive', onPress: () => restore(empty) },
+          { text: 'Restore from this phone', onPress: () => restore(watch) },
         ]);
-      } else {
-        showAlert('Sync failed', (e as Error).message);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+      },
+    );
 
-  const saveStreak = async () => {
+  const saveStreak = () => {
     const value = Math.max(0, Math.min(0xffff, parseInt(streakText, 10) || 0));
     setStreakOpen(false);
-    if (!watch.deviceId) {
-      showAlert('Not paired', 'Pair this watch first to change the streak.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await setTaskStreak(makeTransport(watch.deviceId), watch.deviceId, value);
+    return op.run('Streak update', async (deviceId) => {
+      await setTaskStreak(makeTransport(deviceId), deviceId, value);
       upsertWatch({ ...watch, taskStreak: value });
-    } catch (e) {
-      showAlert('Streak update failed', (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   return (
@@ -199,12 +181,12 @@ export function TasksScreen({ route }: Props) {
             <Text style={styles.addBtnText}>Add</Text>
           </Pressable>
         </View>
-        <Pressable style={[styles.syncBtn, { backgroundColor: needsSync ? colors.accent : colors.accentDim }]} onPress={doSync} disabled={busy} testID="sync-tasks">
-          <Text style={styles.syncBtnText}>{busy ? 'Working…' : needsSync ? 'Sync to watch' : 'Synced ✓'}</Text>
+        <Pressable style={[styles.syncBtn, { backgroundColor: needsSync ? colors.accent : colors.accentDim }]} onPress={doSync} disabled={op.busy !== null} testID="sync-tasks">
+          <Text style={styles.syncBtnText}>{op.busy !== null ? 'Working…' : needsSync ? 'Sync to watch' : 'Synced ✓'}</Text>
         </Pressable>
       </View>
 
-      <TextPromptModal
+      <TextPrompt
         visible={editing !== null}
         title="Rename task"
         value={editText}
@@ -213,7 +195,7 @@ export function TasksScreen({ route }: Props) {
         onCancel={() => setEditing(null)}
         onConfirm={commitRename}
       />
-      <TextPromptModal
+      <TextPrompt
         visible={streakOpen}
         title="Set streak"
         subtitle="Consecutive all-done days shown on the watch."
@@ -224,48 +206,6 @@ export function TasksScreen({ route }: Props) {
         onConfirm={saveStreak}
       />
     </View>
-  );
-}
-
-function TextPromptModal(props: {
-  visible: boolean;
-  title: string;
-  subtitle?: string;
-  value: string;
-  onChangeText: (t: string) => void;
-  maxLength?: number;
-  keyboardType?: 'default' | 'number-pad';
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onCancel}>
-      <Pressable style={styles.modalBackdrop} onPress={props.onCancel}>
-        <Pressable style={styles.modalCard} onPress={() => undefined}>
-          <Text style={styles.modalTitle}>{props.title}</Text>
-          {props.subtitle ? <Text style={styles.modalSubtitle}>{props.subtitle}</Text> : null}
-          <TextInput
-            style={styles.modalInput}
-            value={props.value}
-            onChangeText={props.onChangeText}
-            maxLength={props.maxLength}
-            keyboardType={props.keyboardType ?? 'default'}
-            autoFocus
-            onSubmitEditing={props.onConfirm}
-            returnKeyType="done"
-            testID="prompt-input"
-          />
-          <View style={styles.modalButtons}>
-            <Pressable style={styles.modalBtn} onPress={props.onCancel}>
-              <Text style={styles.modalBtnText}>Cancel</Text>
-            </Pressable>
-            <Pressable style={[styles.modalBtn, { backgroundColor: colors.accent }]} onPress={props.onConfirm} testID="prompt-confirm">
-              <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
 
@@ -290,12 +230,4 @@ const styles = StyleSheet.create({
   addBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   syncBtn: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   syncBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing(3) },
-  modalCard: { backgroundColor: colors.card, borderRadius: 16, padding: spacing(3) },
-  modalTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  modalSubtitle: { color: colors.textDim, fontSize: 13, marginTop: spacing(0.5), lineHeight: 18 },
-  modalInput: { height: 48, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: spacing(2), color: colors.text, fontSize: 16, marginTop: spacing(2) },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(1), marginTop: spacing(2) },
-  modalBtn: { paddingHorizontal: spacing(3), paddingVertical: spacing(1.5), borderRadius: 10 },
-  modalBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });

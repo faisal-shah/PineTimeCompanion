@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListMergeRules, ListSyncBase, mergeList, looksLikeReset, needsSync, withItems, newItemId, syncedList } from './listSync.ts';
-import type { WatchEvent } from './types.ts';
+import { scheduleSpec, taskSpec } from '../ble/listSyncManager.ts';
+import type { WatchEvent, WatchTask } from './types.ts';
 
 const ev = (id: number, title: string, lastModified: number, extra: Partial<WatchEvent> = {}): WatchEvent => ({
   id,
@@ -19,17 +20,9 @@ const ev = (id: number, title: string, lastModified: number, extra: Partial<Watc
   ...extra,
 });
 
-// The schedule's field-equality + display order, mirrored from scheduleSpec.
-const eventRules: ListMergeRules<WatchEvent> = {
-  equal: (a, b) =>
-    a.title === b.title &&
-    a.hour === b.hour &&
-    a.minute === b.minute &&
-    a.anchorDate === b.anchorDate &&
-    a.enabled === b.enabled &&
-    JSON.stringify(a.rule) === JSON.stringify(b.rule),
-  compare: (a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute) || a.id - b.id,
-};
+// Drive the merge through the REAL production rules, not a copy of them, so a
+// change to scheduleSpec/taskSpec is caught here rather than only in e2e.
+const eventRules: ListMergeRules<WatchEvent> = scheduleSpec.rules;
 
 const merge = (mine: WatchEvent[], theirs: WatchEvent[], base: ListSyncBase<WatchEvent> | undefined) => mergeList(mine, theirs, base, eventRules);
 
@@ -136,6 +129,38 @@ test('three devices converge through the watch', () => {
   assert.deepEqual(ids(a2.merged), [2]);
 });
 
+// --- the real taskSpec rules (title + order equality, order-then-id sort) ---
+
+const tk = (id: number, title: string, order: number, lastModified: number): WatchTask => ({ id, title, order, lastModified });
+const mergeTasks = (mine: WatchTask[], theirs: WatchTask[], base: ListSyncBase<WatchTask> | undefined) =>
+  mergeList(mine, theirs, base, taskSpec.rules);
+
+test('taskSpec: a reorder (order changed) counts as an edit, newest wins', () => {
+  const b: ListSyncBase<WatchTask> = { version: 1, syncedAt: 500, items: [tk(1, 'Brush teeth', 0, 100)] };
+  // They moved it to position 2 at t=700; I never touched it.
+  const r = mergeTasks([tk(1, 'Brush teeth', 0, 100)], [tk(1, 'Brush teeth', 2, 700)], b);
+  assert.equal(r.merged[0].order, 2);
+  assert.equal(r.notices[0].kind, 'updatedHere');
+});
+
+test('taskSpec: same title AND order is not a change (no spurious push)', () => {
+  const items = [tk(1, 'Make bed', 1, 100)];
+  const r = mergeTasks(items, items, { version: 1, syncedAt: 500, items });
+  assert.ok(!r.changedLocally && !r.needsPush);
+  assert.equal(r.notices.length, 0);
+});
+
+test('taskSpec: a rename is an edit', () => {
+  const b: ListSyncBase<WatchTask> = { version: 1, syncedAt: 500, items: [tk(1, 'Read', 0, 100)] };
+  const r = mergeTasks([tk(1, 'Read', 0, 100)], [tk(1, 'Read 10 minutes', 0, 700)], b);
+  assert.equal(r.merged[0].title, 'Read 10 minutes');
+});
+
+test('taskSpec: merged list sorts by order, then id', () => {
+  const r = mergeTasks([tk(9, 'c', 2, 1), tk(3, 'a', 0, 1)], [tk(7, 'b', 0, 1)], undefined);
+  assert.deepEqual(r.merged.map((t) => t.id), [3, 7, 9]); // order 0 (id 3, 7) then order 2
+});
+
 // --- generic over any ListItem: a minimal item proves the abstraction ---
 interface Note {
   id: number;
@@ -172,4 +197,16 @@ test('store helpers: needsSync / withItems / newItemId / syncedList', () => {
 
   const synced = syncedList(b, 20);
   assert.deepEqual(synced, { items, version: 5, syncedVersion: 5, base: b, capacity: 20 });
+});
+
+// --- the store's shape guard: a pre-refactor record must not reach the UI ---
+test('parseWatches drops records that predate the SyncedList shape', async () => {
+  const { parseWatches } = await import('../storage/store.ts');
+  const legacy = { id: 'w1', name: 'My PineTime', scheduleVersion: 3, events: [{ id: 1 }], capacity: 64 };
+  const modern = { id: 'w2', name: 'Layla', schedule: { items: [], version: 1 }, tasks: { items: [], version: 1 } };
+  assert.deepEqual(parseWatches(JSON.stringify([legacy, modern])).map((w) => w.id), ['w2']);
+  // and never throws on junk
+  assert.deepEqual(parseWatches(null), []);
+  assert.deepEqual(parseWatches('not json'), []);
+  assert.deepEqual(parseWatches('{"not":"an array"}'), []);
 });

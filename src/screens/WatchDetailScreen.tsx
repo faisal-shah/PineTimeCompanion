@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
@@ -9,13 +9,15 @@ import { Screen } from '../ui/Screen';
 import { CardGrid } from '../ui/CardGrid';
 import { Button } from '../ui/Button';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
+import { Dialog, DialogTitle } from '../ui/Dialog';
+import { useWatchOp } from '../ui/useWatchOp';
 import { makeTransport } from '../ble/transportFactory';
 import { readBattery, sendMessageToWatch, setWatchTime } from '../ble/syncManager';
 import { deleteBeaconPrivateKey } from '../secure/secrets';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
 
-// The four peer features, each with its own screen. Large, readable rows —
+// The per-watch features, each with its own screen. Large, readable rows —
 // this is the watch's home hub.
 type FeatureKey = 'Schedule' | 'Tasks' | 'Alarms' | 'PrayerSettings' | 'Beacon' | 'Weather' | 'Steps' | 'Notifications' | 'Update';
 const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string }[] = [
@@ -33,7 +35,7 @@ const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string
 export function WatchDetailScreen({ navigation, route }: Props) {
   const { watches, upsertWatch, removeWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
-  const [busy, setBusy] = useState<string | null>(null);
+  const op = useWatchOp(watch);
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeText, setComposeText] = useState('');
   const keyboardHeight = useKeyboardHeight();
@@ -42,29 +44,14 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     return null;
   }
 
-  const withTransport = async (label: string, fn: (deviceId: string) => Promise<void>) => {
-    if (!watch.deviceId) {
-      showAlert('Not paired', 'Pair this watch first.');
-      return;
-    }
-    setBusy(label);
-    try {
-      await fn(watch.deviceId);
-    } catch (e) {
-      showAlert(`${label} failed`, (e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const doSetTime = () =>
-    withTransport('Set time', async (deviceId) => {
+    op.run('Set time', async (deviceId) => {
       await setWatchTime(makeTransport(deviceId), deviceId);
       showAlert('Time set', 'Watch clock updated.');
     });
 
   const doBattery = () =>
-    withTransport('Battery', async (deviceId) => {
+    op.run('Battery', async (deviceId) => {
       const percent = await readBattery(makeTransport(deviceId), deviceId);
       upsertWatch({ ...watch, batteryPercent: percent });
     });
@@ -84,7 +71,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       return;
     }
     setComposeOpen(false);
-    void withTransport('Message', async (deviceId) => {
+    void op.run('Message', async (deviceId) => {
       await sendMessageToWatch(makeTransport(deviceId), deviceId, 'Message', text);
       showAlert('Sent', `On its way to ${watch.name}'s watch.`);
     });
@@ -129,10 +116,9 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
   return (
     <>
-      <Modal visible={composeOpen} transparent animationType="fade" onRequestClose={() => setComposeOpen(false)}>
-        <View style={[styles.modalBackdrop, { paddingBottom: keyboardHeight }]}>
-          <View style={styles.composeCard}>
-            <Text style={styles.composeTitle}>Message to {watch.name}</Text>
+      <Dialog visible={composeOpen} onDismiss={() => setComposeOpen(false)}>
+        <View style={{ paddingBottom: keyboardHeight }}>
+          <DialogTitle>Message to {watch.name}</DialogTitle>
             <TextInput
               style={styles.composeInput}
               value={composeText}
@@ -156,10 +142,9 @@ export function WatchDetailScreen({ navigation, route }: Props) {
                 testID="compose-send">
                 <Text style={styles.composeSendText}>Send</Text>
               </Pressable>
-            </View>
           </View>
         </View>
-      </Modal>
+      </Dialog>
 
       <Screen width="list">
         {/* Status strip */}
@@ -206,9 +191,9 @@ export function WatchDetailScreen({ navigation, route }: Props) {
             label={paired ? 'Re-pair' : 'Pair'}
             onPress={() => navigation.navigate('WatchPair', { watchId: watch.id })}
           />
-          <ActionButton icon="🕑" label={busy === 'Set time' ? '…' : 'Set time'} onPress={doSetTime} disabled={busy !== null} />
-          <ActionButton icon="🔋" label={busy === 'Battery' ? '…' : 'Battery'} onPress={doBattery} disabled={busy !== null} />
-          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={busy !== null} />
+          <ActionButton icon="🕑" label={op.busy === 'Set time' ? '…' : 'Set time'} onPress={doSetTime} disabled={op.busy !== null} />
+          <ActionButton icon="🔋" label={op.busy === 'Battery' ? '…' : 'Battery'} onPress={doBattery} disabled={op.busy !== null} />
+          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={op.busy !== null} />
         </View>
 
         <View style={styles.deleteWrap}>
@@ -275,9 +260,6 @@ const styles = StyleSheet.create({
 
   deleteWrap: { marginTop: spacing(4) },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: spacing(2) },
-  composeCard: { backgroundColor: colors.card, borderRadius: 14, padding: spacing(2), width: '100%', maxWidth: 420 },
-  composeTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: spacing(1.5) },
   composeInput: {
     backgroundColor: colors.background,
     color: colors.text,

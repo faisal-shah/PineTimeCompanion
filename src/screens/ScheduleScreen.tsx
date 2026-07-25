@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { needsSync, syncedList, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { useCapStyle } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
+import { useWatchOp } from '../ui/useWatchOp';
 import { describeRule } from '../model/types';
 import { makeTransport } from '../ble/transportFactory';
 import { ListResetError, syncSchedule } from '../ble/listSyncManager';
@@ -18,7 +19,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Schedule'>;
 export function ScheduleScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
-  const [busy, setBusy] = useState(false);
+  const op = useWatchOp(watch);
   const insets = useSafeAreaInsets();
   const cap = useCapStyle('read'); // events read as a list; centre + cap on wide
 
@@ -35,41 +36,33 @@ export function ScheduleScreen({ navigation, route }: Props) {
     }
   };
 
-  const doSync = async () => {
-    if (!watch.deviceId) {
-      showAlert('Not paired', 'Pair this watch first (from the watch screen).');
-      return;
-    }
-    setBusy(true);
-    try {
-      applySync(await syncSchedule(makeTransport(watch.deviceId), watch));
-      // Refresh the watch's weather on this connect (best-effort, non-blocking).
-      void pushWeather(watch).catch(() => undefined);
-    } catch (e) {
-      if (e instanceof ListResetError) {
+  const doSync = () =>
+    op.run(
+      'Sync',
+      async (deviceId) => {
+        applySync(await syncSchedule(makeTransport(deviceId), watch));
+        // Refresh the watch's weather on this connect (best-effort, non-blocking).
+        void pushWeather(watch).catch(() => undefined);
+      },
+      (e) => {
+        if (!(e instanceof ListResetError)) {
+          showAlert('Sync failed', (e as Error).message);
+          return;
+        }
+        const deviceId = watch.deviceId!;
         const empty = { ...watch, schedule: { ...watch.schedule, items: [] } };
+        const restore = (from: typeof watch) =>
+          void syncSchedule(makeTransport(deviceId), from, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message));
         showAlert(
           'Watch looks new or reset',
           'Its schedule is empty but this phone has synced with it before. Restore this phone’s schedule to the watch?',
           [
-            {
-              text: 'Start fresh (keep watch empty)',
-              style: 'destructive',
-              onPress: () => void syncSchedule(makeTransport(watch.deviceId!), empty, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)),
-            },
-            {
-              text: 'Restore from this phone',
-              onPress: () => void syncSchedule(makeTransport(watch.deviceId!), watch, true).then(applySync).catch((err) => showAlert('Sync failed', (err as Error).message)),
-            },
+            { text: 'Start fresh (keep watch empty)', style: 'destructive', onPress: () => restore(empty) },
+            { text: 'Restore from this phone', onPress: () => restore(watch) },
           ],
         );
-      } else {
-        showAlert('Sync failed', (e as Error).message);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+      },
+    );
 
   const deleteEvent = (eventId: number) => {
     showAlert('Delete event?', 'It will be removed from the watch at the next sync.', [
@@ -130,9 +123,9 @@ export function ScheduleScreen({ navigation, route }: Props) {
         <Pressable
           style={[styles.bigButton, { backgroundColor: needsSync(watch.schedule) ? colors.accent : colors.accentDim }]}
           onPress={doSync}
-          disabled={busy}
+          disabled={op.busy !== null}
           testID="sync-watch">
-          <Text style={styles.bigButtonText}>{busy ? 'Syncing…' : needsSync(watch.schedule) ? 'Sync' : 'Synced ✓'}</Text>
+          <Text style={styles.bigButtonText}>{op.busy !== null ? 'Syncing…' : needsSync(watch.schedule) ? 'Sync' : 'Synced ✓'}</Text>
         </Pressable>
       </View>
     </View>
