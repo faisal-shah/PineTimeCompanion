@@ -26,9 +26,9 @@ export const BRIDGE_CHAR = {
   stepsYesterday: 16, // 00030003 read (MotionService: yesterday's total)
   // 17..29 are MusicService/call-event chars, addressed only from the native
   // Kotlin module (WatchChar) and Node e2e scripts, so they're not in this map.
-  tasksSync: 30, // 00070001 write (TaskService: begin/record/commit/abort/setStreak)
-  tasksDigest: 31, // 00070002 read (protoVer, capacity, count, version, streak)
-  taskRead: 32, // 00070003 write index -> read one task record
+  tasksSync: 30, // 000a0001 write (TaskService: begin/record/commit/abort/setStreak)
+  tasksDigest: 31, // 000a0002 read (protoVer, capacity, count, version, streak)
+  taskRead: 32, // 000a0003 write index -> read one task record
 } as const;
 
 export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];
@@ -57,5 +57,28 @@ export class TransportError extends Error {
   constructor(message: string, readonly cause?: unknown) {
     super(message);
     this.name = 'TransportError';
+  }
+}
+
+/**
+ * Run `fn` over one open connection, always disconnecting afterwards. Every
+ * watch operation is a connect → do work → disconnect cycle (the BLE link is
+ * exclusive), so this is the single place that owns that lifecycle.
+ * `mtu` is requested when given; the caller checks the negotiated value.
+ */
+export async function withConnection<T>(
+  transport: WatchTransport,
+  deviceId: string,
+  fn: (transport: WatchTransport) => Promise<T>,
+  mtu?: number,
+): Promise<T> {
+  await transport.connect(deviceId);
+  try {
+    if (mtu !== undefined) {
+      await transport.requestMtu(mtu);
+    }
+    return await fn(transport);
+  } finally {
+    await transport.disconnect().catch(() => undefined);
   }
 }

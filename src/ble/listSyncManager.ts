@@ -8,7 +8,7 @@
 import { Watch, WatchEvent, WatchTask } from '../model/types';
 import { ListItem, ListMergeRules, ListSyncBase, MergeNotice, SyncedList, looksLikeReset, mergeList } from '../model/listSync';
 import { ListDigest, encodeAbortSync, encodeBeginSync, encodeCommitSync, encodeRecordMessage } from './listProtocol';
-import { BRIDGE_CHAR, BridgeCharId, TransportError, WatchTransport } from './transport';
+import { BRIDGE_CHAR, BridgeCharId, TransportError, WatchTransport, withConnection } from './transport';
 import { decodeDigest, decodeEventRecord, encodeEventRecord } from './scheduleProtocol';
 import { TaskDigest, decodeTaskDigest, decodeTaskRecord, encodeSetStreak, encodeTaskRecord } from './tasksProtocol';
 
@@ -93,8 +93,7 @@ export async function syncList<T extends ListItem, D extends ListDigest>(
   if (!deviceId) {
     throw new TransportError('watch is not paired');
   }
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     const mtu = await transport.requestMtu(256);
     if (mtu < MIN_MTU) {
       throw new TransportError(`negotiated MTU ${mtu} is too small to sync (need >= ${MIN_MTU})`);
@@ -129,9 +128,7 @@ export async function syncList<T extends ListItem, D extends ListDigest>(
     const version = randomVersion();
     await pushList(transport, spec, result.merged, version);
     return { skipped: false, base: { version, syncedAt: nowSec(), items: result.merged }, notices: result.notices, digest };
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 // ---- concrete list specs ----
@@ -178,8 +175,7 @@ export function syncTasks(transport: WatchTransport, watch: Watch, acceptReset =
 
 /** Override the watch's streak counter (parent forgives a missed day / sets a reward). */
 export async function setTaskStreak(transport: WatchTransport, deviceId: string, streak: number): Promise<void> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.tasksSync, encodeSetStreak(streak));
     for (let attempt = 0; attempt < 10; attempt++) {
       await new Promise((r) => setTimeout(r, 150));
@@ -189,7 +185,5 @@ export async function setTaskStreak(transport: WatchTransport, deviceId: string,
       }
     }
     throw new TransportError('watch did not confirm the streak change');
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }

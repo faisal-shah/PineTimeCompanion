@@ -8,7 +8,7 @@ import { decodePrayerSettings, encodePrayerSettings, WireSettings } from './pray
 import { CurrentWeather, encodeCurrentWeather, encodeForecast, ForecastDay } from './weatherProtocol';
 import { decodeStepCount } from './stepsProtocol';
 import { BEACON_CONTROL_ENABLE } from './beaconProtocol';
-import { BRIDGE_CHAR, TransportError, WatchTransport } from './transport';
+import { BRIDGE_CHAR, TransportError, WatchTransport, withConnection } from './transport';
 
 /** Standard CTS 0x2A2B write (year LE, month, day, h, m, s, dow 1=Mon..7=Sun, frac256, reason). */
 export function encodeCurrentTime(now: Date): Uint8Array {
@@ -39,34 +39,25 @@ export function encodeMessageAlert(title: string, body: string): Uint8Array {
 }
 
 export async function setWatchTime(transport: WatchTransport, deviceId: string): Promise<void> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.currentTime, encodeCurrentTime(new Date()));
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 export async function sendMessageToWatch(transport: WatchTransport, deviceId: string, title: string, body: string): Promise<void> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.newAlert, encodeMessageAlert(title, body));
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 export async function readBattery(transport: WatchTransport, deviceId: string): Promise<number> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     const payload = await transport.read(BRIDGE_CHAR.battery);
     if (payload.length < 1) {
       throw new TransportError('empty battery read');
     }
     return payload[0];
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /**
@@ -80,13 +71,10 @@ export async function writeWeather(
   current: CurrentWeather,
   forecast: ForecastDay[],
 ): Promise<void> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.weather, encodeCurrentWeather(current));
     await transport.write(BRIDGE_CHAR.weather, encodeForecast(current.timestamp, forecast));
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /**
@@ -100,8 +88,7 @@ export async function readStepCounts(
   transport: WatchTransport,
   deviceId: string,
 ): Promise<{ today: number; yesterday: number | null }> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     const today = decodeStepCount(await transport.read(BRIDGE_CHAR.steps));
     let yesterday: number | null = null;
     try {
@@ -110,9 +97,7 @@ export async function readStepCounts(
       yesterday = null; // firmware predates the yesterday characteristic
     }
     return { today, yesterday };
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /**
@@ -122,8 +107,7 @@ export async function readStepCounts(
  */
 export async function writePrayerSettings(transport: WatchTransport, deviceId: string, settings: WireSettings): Promise<void> {
   const blob = encodePrayerSettings(settings);
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.prayerSettings, blob);
     for (let attempt = 0; attempt < 3; attempt++) {
       await new Promise((r) => setTimeout(r, 200));
@@ -133,19 +117,14 @@ export async function writePrayerSettings(transport: WatchTransport, deviceId: s
       }
     }
     throw new TransportError('watch did not confirm the prayer settings');
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /** Read the watch's current prayer settings (covers on-watch edits). */
 export async function readPrayerSettings(transport: WatchTransport, deviceId: string): Promise<WireSettings> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     return decodePrayerSettings(await transport.read(BRIDGE_CHAR.prayerSettings));
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /**
@@ -157,16 +136,13 @@ export async function writeBeaconKey(transport: WatchTransport, deviceId: string
   if (advKey.length !== 28) {
     throw new TransportError(`advertisement key must be 28 bytes, got ${advKey.length}`);
   }
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.beaconKey, advKey);
     const status = await transport.read(BRIDGE_CHAR.beaconKey);
     if (status.length < 1 || status[0] !== 1) {
       throw new TransportError('watch did not confirm the beacon key');
     }
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /**
@@ -175,10 +151,7 @@ export async function writeBeaconKey(transport: WatchTransport, deviceId: string
  * error. Turning beacon mode OFF is only possible on the watch itself.
  */
 export async function enableBeacon(transport: WatchTransport, deviceId: string): Promise<void> {
-  await transport.connect(deviceId);
-  try {
+  return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.beaconControl, Uint8Array.of(BEACON_CONTROL_ENABLE));
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
