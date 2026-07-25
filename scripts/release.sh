@@ -24,6 +24,12 @@ SKIP_E2E="${2:-}"
 git fetch -q && [ -z "$(git log origin/master..HEAD --oneline)" ] || { echo "unpushed commits — push first"; exit 1; }
 ! git rev-parse "$TAG" >/dev/null 2>&1 || { echo "tag $TAG already exists"; exit 1; }
 
+if [ -s UNRELEASED.md ]; then
+  echo "== UNRELEASED.md — fold this into the release notes, then empty the file =="
+  cat UNRELEASED.md
+  echo
+fi
+
 echo "== gates =="
 npx tsc --noEmit
 npm test
