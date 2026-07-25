@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
-import { newEventId, useWatchStore, withEvents } from '../storage/store';
+import { useWatchStore } from '../storage/store';
+import { newItemId, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
 import { Button } from '../ui/Button';
@@ -26,7 +27,7 @@ const todayIso = () => {
 export function EventEditScreen({ navigation, route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
-  const existing = watch?.events.find((e) => e.id === route.params.eventId);
+  const existing = watch?.schedule.items.find((e) => e.id === route.params.eventId);
 
   const [title, setTitle] = useState(existing?.title ?? '');
   const [hour, setHour] = useState(existing?.hour ?? 8);
@@ -40,7 +41,7 @@ export function EventEditScreen({ navigation, route }: Props) {
 
   const draft: WatchEvent = useMemo(
     () => ({
-      id: existing?.id ?? (watch ? newEventId(watch) : 1),
+      id: existing?.id ?? (watch ? newItemId(watch.schedule.items) : 1),
       title: title.trim() || 'Untitled',
       hour,
       minute,
@@ -66,9 +67,9 @@ export function EventEditScreen({ navigation, route }: Props) {
   }
 
   const save = () => {
-    const others = watch.events.filter((e) => e.id !== draft.id);
+    const others = watch.schedule.items.filter((e) => e.id !== draft.id);
     const stamped = { ...draft, lastModified: Math.floor(Date.now() / 1000) };
-    upsertWatch(withEvents(watch, [...others, stamped]));
+    upsertWatch({ ...watch, schedule: withItems(watch.schedule, [...others, stamped]) });
     navigation.goBack();
   };
 

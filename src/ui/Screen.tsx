@@ -7,7 +7,7 @@ import { CONTENT_MAX_WIDTH, LIST_MAX_WIDTH, READ_MAX_WIDTH, useLayout } from './
 export type ScreenWidth = 'read' | 'content' | 'list' | 'full';
 
 /** The max content width for a variant on a WIDE screen; `undefined` = uncapped. */
-export function maxWidthFor(width: ScreenWidth, isWide: boolean): number | undefined {
+function maxWidthFor(width: ScreenWidth, isWide: boolean): number | undefined {
   if (!isWide || width === 'full') return undefined;
   if (width === 'read') return READ_MAX_WIDTH;
   if (width === 'list') return LIST_MAX_WIDTH;

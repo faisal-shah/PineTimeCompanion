@@ -104,11 +104,13 @@ const tasks = [
   { id: 15, title: 'Water the plants', order: 4, lastModified: nowSec * 1000 },
 ];
 const mkWatch = (id, name, battery) => ({
-  id, name, deviceId: 'localhost:18633', scheduleVersion: 3, syncedVersion: 3,
-  lastSyncAt: new Date().toISOString(), batteryPercent: battery, capacity: 64,
+  id, name, deviceId: 'localhost:18633',
+  lastSyncAt: new Date().toISOString(), batteryPercent: battery,
   prayerSettings: { method: 'ummAlQura', asrMadhab: 'standard', alertsEnabled: true, latE2: 2142, lonE2: 3983, utcOffsetQuarters: 12, editedAt: nowSec },
-  forwardNotifications: false, events,
-  tasks, taskVersion: 4, taskSyncedVersion: 4, taskCapacity: 20, taskStreak: 12,
+  forwardNotifications: false,
+  schedule: { items: events, version: 3, syncedVersion: 3, base: { version: 3, syncedAt: nowSec, items: events }, capacity: 64 },
+  tasks: { items: tasks, version: 4, syncedVersion: 4, base: { version: 4, syncedAt: nowSec, items: tasks }, capacity: 20 },
+  taskStreak: 12,
 });
 const watches = [mkWatch('w1', 'My PineTime', 82), mkWatch('w2', "Layla's watch", 47)];
 const stepDays = [6200, 8100, 10400, 4300, 9700, 12500, 7600, 9100, 11200, 5400, 8800, 10100, 9500, 7500];

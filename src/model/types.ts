@@ -1,6 +1,8 @@
-// Data model. A "watch" is one PineTime running our InfiniTime fork; each has
-// its own schedule of recurring events, synced via the Schedule Service
-// (InfiniTime doc/ScheduleService.md).
+// Data model. A "watch" is one PineTime running our InfiniTime fork; each holds
+// several watch-authoritative synced lists (schedule, daily tasks) plus scalar
+// settings. The lists all ride the generic list-sync engine (model/listSync.ts).
+
+import { ListItem, SyncedList } from './listSync';
 
 export type RuleKind = 'once' | 'everyNDays' | 'weekly' | 'monthly';
 
@@ -37,27 +39,15 @@ export interface EventRule {
   dayOfMonth?: number;
 }
 
-export interface WatchEvent {
-  /** random 16-bit id, unique per watch across ALL companions (not sequential) */
-  id: number;
-  title: string; // shown on the watch; truncated to 23 UTF-8 bytes on sync
+export interface WatchEvent extends ListItem {
+  // id / title / lastModified come from ListItem (title truncates to 23 UTF-8
+  // bytes on sync; lastModified drives merge conflicts).
   hour: number; // 0-23, watch-local
   minute: number; // 0-59
   /** rule start date (and the date of a one-shot), YYYY-MM-DD local */
   anchorDate: string;
   rule: EventRule;
   enabled: boolean;
-  /** UNIX seconds (UTC) of the last edit on any companion; drives merge conflicts */
-  lastModified: number;
-}
-
-/** What this device last successfully synced — the "base" of the three-way merge. */
-export interface SyncBase {
-  /** schedule version we committed */
-  version: number;
-  /** UNIX seconds when the sync happened */
-  syncedAt: number;
-  events: WatchEvent[];
 }
 
 /**
@@ -67,21 +57,10 @@ export interface SyncBase {
  * watch (resets at midnight) and is never part of this record, so it can't
  * create merge conflicts.
  */
-export interface WatchTask {
-  /** random 16-bit id, unique per watch across ALL companions */
-  id: number;
-  title: string; // shown on the watch; truncated to 23 UTF-8 bytes on sync
+export interface WatchTask extends ListItem {
+  // id / title / lastModified come from ListItem.
   /** display order (0..255); the watch lists tasks by it */
   order: number;
-  /** UNIX seconds (UTC) of the last edit on any companion; drives merge conflicts */
-  lastModified: number;
-}
-
-/** The task-list equivalent of SyncBase — last successful task sync snapshot. */
-export interface TaskSyncBase {
-  version: number;
-  syncedAt: number;
-  tasks: WatchTask[];
 }
 
 /** Per-watch FindMy beacon config. Only advertisementKeyB64 goes to the watch. */
@@ -104,35 +83,19 @@ export interface Watch {
   name: string; // e.g. "Layla's watch"
   /** BLE device id (MAC) once paired; undefined until then */
   deviceId?: string;
-  /** monotonically increasing; the watch echoes it in its Digest */
-  scheduleVersion: number;
-  /** version last confirmed on the watch (undefined = never synced) */
-  syncedVersion?: number;
   lastSyncAt?: string; // ISO timestamp
-  /** last successful sync snapshot; absent until the first sync */
-  syncBase?: SyncBase;
   batteryPercent?: number;
-  /** event slots on the watch, from its Digest; unknown until the first sync */
-  capacity?: number;
   /** prayer configuration; absent until first configured */
   prayerSettings?: PrayerSettings;
   /** FindMy beacon key; absent until generated */
   beacon?: BeaconConfig;
   /** Forward phone notifications to this watch (Android only, persistent link). */
   forwardNotifications?: boolean;
-  events: WatchEvent[];
 
-  // --- Daily task checklist (mirrors the schedule sync fields) ---
-  /** the day's tasks; phone-edited, watch-authoritative */
-  tasks?: WatchTask[];
-  /** monotonically increasing; bumped on every task edit (like scheduleVersion) */
-  taskVersion?: number;
-  /** task version last confirmed on the watch */
-  taskSyncedVersion?: number;
-  /** last successful task-sync snapshot; absent until the first task sync */
-  taskSyncBase?: TaskSyncBase;
-  /** task slots on the watch, from its task digest */
-  taskCapacity?: number;
+  /** recurring reminders — watch-authoritative synced list */
+  schedule: SyncedList<WatchEvent>;
+  /** daily task checklist — watch-authoritative synced list */
+  tasks: SyncedList<WatchTask>;
   /** consecutive all-done-days streak, read from the watch; the app may override it */
   taskStreak?: number;
 }

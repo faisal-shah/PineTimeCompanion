@@ -2,14 +2,38 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext } from 'react';
-import { Watch, WatchEvent, WatchTask } from '../model/types';
+import { Watch } from '../model/types';
+import { SyncedList, emptyList } from '../model/listSync';
 
 const STORAGE_KEY = 'pinetime-companion/watches/v1';
 
+/** A stored record is usable only if it has the shape the current code reads.
+ *  This is deliberately NOT a migration — the app is pre-1.0 and formats change
+ *  freely — but the store parses JSON off disk, so it must never hand the UI a
+ *  record it can't render. Anything unrecognisable is dropped, which resets that
+ *  watch rather than white-screening the app. */
+function isUsable(w: unknown): w is Watch {
+  const c = w as Partial<Watch> | null;
+  const list = (l: unknown) => typeof l === 'object' && l !== null && Array.isArray((l as SyncedList<never>).items);
+  return typeof c === 'object' && c !== null && typeof c.id === 'string' && typeof c.name === 'string' && list(c.schedule) && list(c.tasks);
+}
+
+/** Pure half of loadWatches, so the shape guard is unit-testable. */
+export function parseWatches(raw: string | null): Watch[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isUsable) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function loadWatches(): Promise<Watch[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Watch[]) : [];
+    return parseWatches(await AsyncStorage.getItem(STORAGE_KEY));
   } catch {
     return [];
   }
@@ -23,42 +47,9 @@ export function newWatch(name: string): Watch {
   return {
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     name,
-    scheduleVersion: 1,
-    events: [],
-    tasks: [],
-    taskVersion: 1,
+    schedule: emptyList(),
+    tasks: emptyList(),
   };
-}
-
-/** Random 16-bit ids so events created on different phones never collide. */
-export function newEventId(watch: Watch): number {
-  for (;;) {
-    const id = 1 + Math.floor(Math.random() * 0xfffe);
-    if (!watch.events.some((e) => e.id === id)) {
-      return id;
-    }
-  }
-}
-
-/** Any schedule edit bumps the version so the watch digest goes stale. */
-export function withEvents(watch: Watch, events: WatchEvent[]): Watch {
-  return { ...watch, events, scheduleVersion: watch.scheduleVersion + 1 };
-}
-
-/** Random 16-bit ids so tasks created on different phones never collide. */
-export function newTaskId(watch: Watch): number {
-  const tasks = watch.tasks ?? [];
-  for (;;) {
-    const id = 1 + Math.floor(Math.random() * 0xfffe);
-    if (!tasks.some((t) => t.id === id)) {
-      return id;
-    }
-  }
-}
-
-/** Any task edit bumps the task version so the watch digest goes stale. */
-export function withTasks(watch: Watch, tasks: WatchTask[]): Watch {
-  return { ...watch, tasks, taskVersion: (watch.taskVersion ?? 1) + 1 };
 }
 
 export interface WatchStore {

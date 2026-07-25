@@ -4,16 +4,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  encodeEventRecord,
-  encodeEventMessage,
-  encodeBeginSync,
-  encodeCommitSync,
-  encodeAbortSync,
-  encodeTitle,
-  decodeDigest,
-  decodeEventRecord,
-} from './scheduleProtocol.ts';
+import { encodeEventRecord, encodeEventMessage, decodeDigest, decodeEventRecord } from './scheduleProtocol.ts';
+import { encodeBeginSync, encodeCommitSync, encodeAbortSync, encodeTitle } from './listProtocol.ts';
 import type { WatchEvent } from '../model/types.ts';
 
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex');
@@ -82,12 +74,12 @@ test('CommitSync and AbortSync', () => {
 
 test('Digest golden vector round-trip', () => {
   const digest = decodeDigest(Uint8Array.from(Buffer.from('01100307000000', 'hex')));
-  assert.deepEqual(digest, { protocolVersion: 1, capacity: 16, count: 3, scheduleVersion: 7 });
+  assert.deepEqual(digest, { protocolVersion: 1, capacity: 16, count: 3, version: 7 });
 });
 
 test('Digest from a 64-slot watch (doc/ScheduleService.md example)', () => {
   const digest = decodeDigest(Uint8Array.from(Buffer.from('01400307000000', 'hex')));
-  assert.deepEqual(digest, { protocolVersion: 1, capacity: 64, count: 3, scheduleVersion: 7 });
+  assert.deepEqual(digest, { protocolVersion: 1, capacity: 64, count: 3, version: 7 });
 });
 
 test('title truncation respects UTF-8 boundaries', () => {

@@ -1,13 +1,21 @@
-// Pull-merge-push for the Multi-Alarm Service. The watch is the source of
+// Compare-and-swap sync for the Multi-Alarm Service. The watch is the source of
 // truth; edits are applied per-slot against the watch's current state under a
-// compare-and-swap version, so two phones editing different alarms don't
-// clobber each other. On a CAS rejection (another phone/the watch changed the
-// alarms since we read) we re-pull, re-apply just our slot, and retry.
+// CAS version, so two phones editing different alarms don't clobber each other.
+// On a CAS rejection (another phone or the watch changed the alarms since we
+// read) we re-pull, re-apply just our slot, and retry.
+//
+// Deliberately NOT the staged-list/three-way-merge model the schedule and tasks
+// use (src/ble/listSyncManager.ts). Alarms are a fixed 5 slots with no per-item
+// id, title or lastModified, and the WATCH edits them too — its UI, and the
+// firmware itself, which disables a one-shot alarm the moment it fires. CAS
+// never silently loses a write and needs no clock; a timestamp merge against a
+// skewed watch clock could resurrect an alarm that has already gone off. See
+// InfiniTime doc/ble.md, "Companion sync models".
 //
 // Each exported call owns one connection for its whole operation — the CAS
 // loop must read and write over the same open link.
 
-import { WatchTransport, BRIDGE_CHAR } from './transport';
+import { WatchTransport, BRIDGE_CHAR, withConnection } from './transport';
 import {
   Alarm,
   MAX_ALARMS,
@@ -17,27 +25,14 @@ import {
 } from './multiAlarmProtocol';
 
 const MAX_CAS_RETRIES = 5;
-
-async function withConnection<T>(
-  transport: WatchTransport,
-  deviceId: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  await transport.connect(deviceId);
-  try {
-    await transport.requestMtu(64);
-    return await fn();
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
-}
+const MTU = 64; // the alarm blob is 24 B; this is ample
 
 async function readOverOpen(transport: WatchTransport): Promise<MultiAlarmState> {
   return decodeMultiAlarm(await transport.read(BRIDGE_CHAR.multiAlarm));
 }
 
 export function readAlarms(transport: WatchTransport, deviceId: string): Promise<MultiAlarmState> {
-  return withConnection(transport, deviceId, () => readOverOpen(transport));
+  return withConnection(transport, deviceId, () => readOverOpen(transport), MTU);
 }
 
 /**
@@ -69,7 +64,7 @@ export function updateAlarms(
       }
     }
     throw new Error(`alarm sync kept conflicting after ${MAX_CAS_RETRIES} retries: ${lastError?.message ?? 'unknown'}`);
-  });
+  }, MTU);
 }
 
 export function setAlarm(

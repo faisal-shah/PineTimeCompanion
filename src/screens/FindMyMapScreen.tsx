@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -8,6 +8,7 @@ import circle from '@turf/circle';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { showAlert } from '../ui/alert';
 import { LocationFix } from '../findmy/decrypt';
 import { getWatchLocations } from '../findmy/track';
 import { UnauthorizedError } from '../findmy/fetch';
@@ -82,7 +83,7 @@ export function FindMyMapScreen({ route, navigation }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Location permission needed', 'Allow location access to center the map on your phone.');
+        showAlert('Location permission needed', 'Allow location access to center the map on your phone.');
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -90,7 +91,7 @@ export function FindMyMapScreen({ route, navigation }: Props) {
       setPhone(p);
       cameraRef.current?.easeTo({ center: [p.lon, p.lat], zoom: RECENTER_ZOOM, duration: 500 });
     } catch (e) {
-      Alert.alert('Could not get your location', (e as Error).message);
+      showAlert('Could not get your location', (e as Error).message);
     } finally {
       setLocating(false);
     }
