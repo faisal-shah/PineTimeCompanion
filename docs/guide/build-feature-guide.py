@@ -186,6 +186,12 @@ parts.append(f"""
     <b>Notification forwarding, per watch.</b> Turn on <b>Forward notifications</b> for a watch and the alerts from the apps you choose (a searchable allowlist) show up on its wrist; incoming calls ring it with the caller's name. It's <b>per watch on purpose</b> &mdash; forward to your own watch but not the kids'. A grant of Android's Notification Access is all it needs; a foreground service keeps the link alive with the app swiped away.
   </div>
   <div class="note">
+    <b>Granting Notification Access on Android 13+.</b> Android hides this permission for any app installed outside the Play Store, and the greyed-out switch just says &ldquo;Restricted setting&rdquo;. The unlock sits in an overflow menu: tap the greyed-out switch and press OK, go to <b>App info</b>, tap <b>&#8942; &rarr; Allow restricted settings</b>, then come back and grant access. The app's Notifications screen deep-links to both pages and spells out these steps if the first attempt doesn't take.
+  </div>
+  <div class="note">
+    <b>What each switch covers.</b> <b>Forward incoming calls</b> works on its own &mdash; no phone app needs picking, because a ringing call is flagged as a call rather than an ordinary notification. Missed calls and voicemail <i>are</i> ordinary notifications, so tick your dialer in the app list if you want those too. <b>Now playing</b> and the watch's music controls need only Notification Access; the app list doesn't affect them.
+  </div>
+  <div class="note">
     <b>Music control</b> rides the same switch. The watch's Music app shows the current track, artist and progress from whatever's playing on the phone, and its buttons drive the phone back &mdash; play/pause, next/previous, and volume. Change the song on the phone and the wrist follows; skip on the wrist and the phone skips.
   </div>
 </section>
