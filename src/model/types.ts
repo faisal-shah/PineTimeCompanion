@@ -15,10 +15,13 @@ export type AsrMadhab = 'standard' | 'hanafi';
  * integer wire units (degrees x100, quarter-hours) so app<->watch round trips
  * stay exact.
  */
+export type PrayerAlerts = 'off' | 'all' | 'exceptFajr';
+
 export interface PrayerSettings {
   method: PrayerMethod;
   asrMadhab: AsrMadhab;
-  alertsEnabled: boolean;
+  /** 'all' vibrates at every prayer; 'exceptFajr' skips the pre-dawn one. */
+  alerts: PrayerAlerts;
   /** latitude in degrees x100, north positive (-9000..9000) */
   latE2: number;
   /** longitude in degrees x100, east positive (-18000..18000) */

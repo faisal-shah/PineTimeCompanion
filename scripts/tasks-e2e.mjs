@@ -91,9 +91,12 @@ async function midnight(nextDay) { await setClock(nextDay); await sleep(900); } 
 // Enter the Tasks app ONCE from the watchface (its launcher tile is page-1
 // slot 4), then stay in-app for every round: leaving via `button` lands on the
 // launcher, and paging there would open the wrong app. Summary<->checklist is
-// driven purely by tap (open) and swipe-down (back), which never leave the app.
+// driven by swipe-up (open) and swipe-down (back), which never leave the app.
+// It used to open on a tap, but the tap that launches the app from the drawer
+// leaked into the screen and skipped the summary, so the watch now uses a
+// swipe.
 function enterTasks() { awake(); settle('swipe', 'up'); settle('tap', '45', '160'); }
-const openList = () => { awake(); settle('tap', '120', '120'); }; // tap summary -> checklist
+const openList = () => { awake(); settle('swipe', 'up'); }; // summary -> checklist
 const tickRow = (i) => { awake(); settle('tap', '20', String(48 + i * 48)); };
 const backToSummary = () => settle('swipe', 'down'); // checklist page 0 -> summary
 

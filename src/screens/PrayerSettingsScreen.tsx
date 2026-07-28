@@ -8,8 +8,9 @@ import { formatMinutesOfDay } from '../util/formatTime';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
+import { Hint } from '../ui/Hint';
 import { Button } from '../ui/Button';
-import { AsrMadhab, PrayerMethod, PrayerSettings } from '../model/types';
+import { AsrMadhab, PrayerAlerts, PrayerMethod, PrayerSettings } from '../model/types';
 import { computePrayerTimes, PRAYERS } from '../model/prayerTimes';
 import { WireSettings } from '../ble/prayerProtocol';
 import { readPrayerSettings, writePrayerSettings } from '../ble/syncManager';
@@ -34,7 +35,7 @@ const phoneUtcQuarters = () => -Math.round(new Date().getTimezoneOffset() / 15);
 const defaultSettings = (): Omit<PrayerSettings, 'editedAt'> => ({
   method: 'mwl',
   asrMadhab: 'standard',
-  alertsEnabled: true,
+  alerts: 'all',
   latE2: 0,
   lonE2: 0,
   utcOffsetQuarters: phoneUtcQuarters(),
@@ -45,6 +46,12 @@ const formatOffset = (q: number) => {
   const abs = Math.abs(m);
   return `${m < 0 ? '-' : '+'}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
 };
+
+const ALERT_OPTIONS: { value: PrayerAlerts; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'all', label: 'All prayers' },
+  { value: 'exceptFajr', label: 'All but Fajr' },
+];
 
 export function PrayerSettingsScreen({ route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
@@ -65,7 +72,7 @@ export function PrayerSettingsScreen({ route }: Props) {
 
   const [method, setMethod] = useState<PrayerMethod>(initial.method);
   const [asrMadhab, setAsrMadhab] = useState<AsrMadhab>(initial.asrMadhab);
-  const [alertsEnabled, setAlertsEnabled] = useState(initial.alertsEnabled);
+  const [alerts, setAlerts] = useState<PrayerAlerts>(initial.alerts);
   const [latText, setLatText] = useState((initial.latE2 / 100).toFixed(2));
   const [lonText, setLonText] = useState((initial.lonE2 / 100).toFixed(2));
   const [utcQuarters, setUtcQuarters] = useState(initial.utcOffsetQuarters);
@@ -87,7 +94,7 @@ export function PrayerSettingsScreen({ route }: Props) {
     return {
       method,
       asrMadhab,
-      alertsEnabled,
+      alerts,
       latE2: Math.round(lat * 100),
       lonE2: Math.round(lon * 100),
       utcOffsetQuarters: utcQuarters,
@@ -184,7 +191,7 @@ export function PrayerSettingsScreen({ route }: Props) {
       const s = await readPrayerSettings(makeTransport(watch.deviceId), watch.deviceId);
       setMethod(s.method);
       setAsrMadhab(s.asrMadhab);
-      setAlertsEnabled(s.alertsEnabled);
+      setAlerts(s.alerts);
       setLatText((s.latE2 / 100).toFixed(2));
       setLonText((s.lonE2 / 100).toFixed(2));
       setUtcQuarters(s.utcOffsetQuarters);
@@ -225,10 +232,19 @@ export function PrayerSettingsScreen({ route }: Props) {
         ))}
       </View>
 
-      <View style={[styles.row, { justifyContent: 'space-between', marginTop: spacing(2) }]}>
-        <Text style={styles.inlineLabel}>Vibrate at each prayer</Text>
-        <Switch value={alertsEnabled} onValueChange={setAlertsEnabled} trackColor={{ true: colors.accent }} />
+      <Text style={styles.label}>Vibrate</Text>
+      <View style={styles.segmentRow}>
+        {ALERT_OPTIONS.map(({ value, label }) => (
+          <Pressable
+            key={value}
+            style={[styles.segment, alerts === value && styles.segmentActive]}
+            onPress={() => setAlerts(value)}
+            testID={`alerts-${value}`}>
+            <Text style={[styles.segmentText, alerts === value && styles.segmentTextActive]}>{label}</Text>
+          </Pressable>
+        ))}
       </View>
+      <Hint>Sunrise is shown for reference and never vibrates.</Hint>
 
       <Text style={styles.label}>Location</Text>
       <View style={styles.row}>

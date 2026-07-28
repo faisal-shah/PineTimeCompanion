@@ -12,7 +12,7 @@ test('encode: Chicago-ish, ISNA, Hanafi, alerts on', () => {
   const b = encodePrayerSettings({
     method: 'isna',
     asrMadhab: 'hanafi',
-    alertsEnabled: true,
+    alerts: 'all' as const,
     latE2: 4188,
     lonE2: -8763,
     utcOffsetQuarters: -20,
@@ -26,7 +26,7 @@ test('encode: Mecca, Umm al-Qura, Standard, alerts off', () => {
   const b = encodePrayerSettings({
     method: 'ummAlQura',
     asrMadhab: 'standard',
-    alertsEnabled: false,
+    alerts: 'off',
     latE2: 2142,
     lonE2: 3983,
     utcOffsetQuarters: 12,
@@ -36,7 +36,7 @@ test('encode: Mecca, Umm al-Qura, Standard, alerts off', () => {
 
 test('extreme offsets survive the round trip', () => {
   for (const q of [-48, 56]) {
-    const s = { method: 'mwl' as const, asrMadhab: 'standard' as const, alertsEnabled: true, latE2: -9000, lonE2: 18000, utcOffsetQuarters: q };
+    const s = { method: 'mwl' as const, asrMadhab: 'standard' as const, alerts: 'all' as const, latE2: -9000, lonE2: 18000, utcOffsetQuarters: q };
     assert.deepEqual(decodePrayerSettings(encodePrayerSettings(s)), s);
   }
 });
@@ -45,7 +45,7 @@ test('round trip preserves negative coordinates exactly', () => {
   const s = {
     method: 'karachi' as const,
     asrMadhab: 'hanafi' as const,
-    alertsEnabled: false,
+    alerts: 'off' as const,
     latE2: -3387, // Sydney
     lonE2: 15121,
     utcOffsetQuarters: 40,
@@ -55,14 +55,41 @@ test('round trip preserves negative coordinates exactly', () => {
 
 test('decode rejects wrong length and version', () => {
   assert.throws(() => decodePrayerSettings(new Uint8Array(8)));
-  const bad = encodePrayerSettings({ method: 'mwl', asrMadhab: 'standard', alertsEnabled: false, latE2: 0, lonE2: 0, utcOffsetQuarters: 0 });
+  const bad = encodePrayerSettings({ method: 'mwl', asrMadhab: 'standard', alerts: 'off', latE2: 0, lonE2: 0, utcOffsetQuarters: 0 });
   bad[0] = 2;
   assert.throws(() => decodePrayerSettings(bad));
 });
 
 test('encode rejects out-of-range values', () => {
-  const base = { method: 'mwl' as const, asrMadhab: 'standard' as const, alertsEnabled: true, latE2: 0, lonE2: 0, utcOffsetQuarters: 0 };
+  const base = { method: 'mwl' as const, asrMadhab: 'standard' as const, alerts: 'all' as const, latE2: 0, lonE2: 0, utcOffsetQuarters: 0 };
   assert.throws(() => encodePrayerSettings({ ...base, latE2: 9001 }));
   assert.throws(() => encodePrayerSettings({ ...base, lonE2: -18001 }));
   assert.throws(() => encodePrayerSettings({ ...base, utcOffsetQuarters: 57 }));
+});
+
+test('encode: all-but-Fajr sets both flag bits', () => {
+  const b = encodePrayerSettings({
+    method: 'isna',
+    asrMadhab: 'hanafi',
+    alerts: 'exceptFajr',
+    latE2: 4188,
+    lonE2: -8763,
+    utcOffsetQuarters: -20,
+  });
+  // Same as the alerts-on vector but flags 0x03 instead of 0x01.
+  assert.equal(hex(b), '010101035c10c5ddec');
+});
+
+test('the three alert modes round trip', () => {
+  const base = { method: 'mwl' as const, asrMadhab: 'standard' as const, latE2: 0, lonE2: 0, utcOffsetQuarters: 0 };
+  for (const alerts of ['off', 'all', 'exceptFajr'] as const) {
+    assert.equal(decodePrayerSettings(encodePrayerSettings({ ...base, alerts })).alerts, alerts);
+  }
+});
+
+test('decode treats skip-Fajr without the enable bit as off', () => {
+  // The watch rejects 0x02 outright; the app must not invent a fourth state.
+  const b = encodePrayerSettings({ method: 'mwl', asrMadhab: 'standard', alerts: 'off', latE2: 0, lonE2: 0, utcOffsetQuarters: 0 });
+  b[3] = 0x02;
+  assert.equal(decodePrayerSettings(b).alerts, 'off');
 });

@@ -4,7 +4,7 @@
 // (prayerProtocol.test.ts). The same 9 bytes are the BLE characteristic
 // value, the watch's /.system/prayer.dat and this app's canonical form.
 
-import { AsrMadhab, PrayerMethod, PrayerSettings } from '../model/types';
+import { AsrMadhab, PrayerAlerts, PrayerMethod, PrayerSettings } from '../model/types';
 
 export const PRAYER_SERVICE_UUID = '00070000-78fc-48fe-8e23-433b3a1942d0';
 export const PRAYER_SETTINGS_CHAR_UUID = '00070001-78fc-48fe-8e23-433b3a1942d0';
@@ -30,6 +30,17 @@ function readI16le(bytes: Uint8Array, offset: number): number {
 /** Settings the app writes; editedAt is app-local and never on the wire. */
 export type WireSettings = Omit<PrayerSettings, 'editedAt'>;
 
+// flags byte: bit0 = alerts on, bit1 = skip Fajr. The watch rejects 0x02
+// (skip-Fajr without the enable bit) as an encoder error.
+const ALERT_FLAGS: Record<PrayerAlerts, number> = { off: 0x00, all: 0x01, exceptFajr: 0x03 };
+
+function decodeAlerts(flags: number): PrayerAlerts {
+  if ((flags & 0x01) === 0) {
+    return 'off';
+  }
+  return (flags & 0x02) !== 0 ? 'exceptFajr' : 'all';
+}
+
 export function encodePrayerSettings(s: WireSettings): Uint8Array {
   if (s.latE2 < -9000 || s.latE2 > 9000 || s.lonE2 < -18000 || s.lonE2 > 18000) {
     throw new Error('coordinates out of range');
@@ -41,7 +52,7 @@ export function encodePrayerSettings(s: WireSettings): Uint8Array {
   b[0] = PRAYER_SETTINGS_VERSION;
   b[1] = METHOD_CODES[s.method];
   b[2] = MADHAB_CODES[s.asrMadhab];
-  b[3] = s.alertsEnabled ? 0x01 : 0x00;
+  b[3] = ALERT_FLAGS[s.alerts];
   [b[4], b[5]] = i16le(Math.round(s.latE2));
   [b[6], b[7]] = i16le(Math.round(s.lonE2));
   b[8] = s.utcOffsetQuarters < 0 ? s.utcOffsetQuarters + 0x100 : s.utcOffsetQuarters;
@@ -60,7 +71,7 @@ export function decodePrayerSettings(bytes: Uint8Array): WireSettings {
   return {
     method,
     asrMadhab,
-    alertsEnabled: (bytes[3] & 0x01) !== 0,
+    alerts: decodeAlerts(bytes[3]),
     latE2: readI16le(bytes, 4),
     lonE2: readI16le(bytes, 6),
     utcOffsetQuarters: bytes[8] >= 0x80 ? bytes[8] - 0x100 : bytes[8],
