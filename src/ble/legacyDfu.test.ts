@@ -12,6 +12,10 @@ import { DfuArchive } from './dfuZip';
 class MockDfuWatch implements WatchTransport {
   readonly ctrlWrites: Uint8Array[] = [];
   readonly packets: Uint8Array[] = [];
+  /** Set once the watch has reset out from under the final write. */
+  resetRaced = false;
+  /** Make this control-point opcode fail, to exercise phase reporting. */
+  failCtrlOp?: number;
   private notify?: (n: Uint8Array) => void;
   private bytesReceived = 0;
   private appSize = 0;
@@ -42,6 +46,7 @@ class MockDfuWatch implements WatchTransport {
     assert.equal(charId, BRIDGE_CHAR.dfuControl, 'ctrl commands go to the control point');
     this.ctrlWrites.push(data);
     const [op, sub] = data;
+    if (op === this.failCtrlOp) throw new Error('radio fell over');
     if (op === 0x01) return; // StartDFU: response comes after the size packet
     if (op === 0x02 && sub === 0x01) this.send([0x10, 0x02, 0x01]); // init complete
     if (op === 0x03) return; // ReceiveImage: response comes after all bytes
@@ -52,6 +57,15 @@ class MockDfuWatch implements WatchTransport {
   }
 
   async writeWithoutResponse(charId: number, data: Uint8Array): Promise<void> {
+    // Activate+Reset is the one control-point command sent without a response:
+    // the watch calls NVIC_SystemReset() on receipt and the link dies before it
+    // could ever ACK. Model that — the write rejects, and runDfu must not care.
+    if (charId === BRIDGE_CHAR.dfuControl) {
+      assert.equal(data[0], 0x05, 'only Activate+Reset is written to ctrl without a response');
+      this.ctrlWrites.push(data);
+      this.resetRaced = true;
+      throw new Error('Characteristic 00001531-1212-efde-1523-785feabcd123 write failed');
+    }
     assert.equal(charId, BRIDGE_CHAR.dfuPacket, 'firmware bytes go to the packet char');
     assert.ok(data.length <= 20, `packet must be <= 20 bytes, got ${data.length}`);
     this.packets.push(data);
@@ -110,6 +124,20 @@ test('runDfu drives the full handshake and streams the image in 20-byte chunks',
   assert.equal(payload.length, 21);
   assert.equal(payload.at(-1)!.length, 10);
   assert.equal(payload.reduce((n, p) => n + p.length, 0), 410);
+
+  // The watch reset mid-write and the write rejected — runDfu still resolved.
+  // Regression for the "Update failed: Characteristic 00001531-… write failed"
+  // dialog that appeared on every *successful* update.
+  assert.ok(watch.resetRaced, 'Activate+Reset must be written without a response');
+});
+
+test('runDfu names the step a transport failure came from', async () => {
+  const watch = new MockDfuWatch(true);
+  watch.failCtrlOp = 0x03; // ReceiveImage
+  await assert.rejects(runDfu(watch, makeArchive(200)), (e) => {
+    assert.match((e as Error).message, /Failed while transferring the firmware: radio fell over/);
+    return true;
+  });
 });
 
 test('runDfu never activates and throws DfuAbortedError when the watch rejects the CRC', async () => {

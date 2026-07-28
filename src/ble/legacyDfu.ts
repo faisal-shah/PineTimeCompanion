@@ -12,6 +12,11 @@
 //   [0x10,0x04,0x05]. There is no signature.
 // - After Activate+Reset the image boots UNVALIDATED — the user must tap Validate
 //   on the watch or the next reboot rolls back. No BLE opcode confirms it.
+// - Activate+Reset MUST be a write WITHOUT response (ble.md "send 0x05 to the
+//   control point as a command with no response"): the firmware answers it by
+//   pushing BleFirmwareUpdateFinished, and SystemTask calls NVIC_SystemReset()
+//   on receipt, so the MCU is gone before it can send an ATT Write Response.
+//   Writing it with-response reports a bogus failure on every successful update.
 
 import { BRIDGE_CHAR, TransportError, WatchTransport } from './transport';
 import { NotificationInbox } from './notificationInbox';
@@ -48,6 +53,15 @@ export interface DfuProgress {
 
 export class DfuAbortedError extends Error {}
 
+/** Which of the nine steps was in flight when a transport error surfaced. */
+const PHASE_LABEL: Record<DfuPhase, string> = {
+  start: 'starting the update',
+  init: 'sending the init packet',
+  transfer: 'transferring the firmware',
+  validate: 'validating the image',
+  activate: 'activating the new image',
+};
+
 const isResponse = (op: number, err: number) => (n: Uint8Array) => n[0] === RSP && n[1] === op && n[2] === err;
 
 /**
@@ -65,11 +79,29 @@ export async function runDfu(
   const inbox = new NotificationInbox(NOTIFY_TIMEOUT_MS);
   const unsubscribe = await transport.subscribe(BRIDGE_CHAR.dfuControl, (n) => inbox.push(n));
 
+  // Tracked so a raw GATT error ("Characteristic 0000… write failed") can say
+  // which of the nine steps it came from — otherwise the report is undebuggable.
+  let phase: DfuPhase = 'start';
+  const report = (p: DfuPhase, sent: number) => {
+    phase = p;
+    onProgress?.({ phase: p, sent, total });
+  };
+
   const ctrl = (bytes: number[]) => transport.write(BRIDGE_CHAR.dfuControl, new Uint8Array(bytes));
   const packet = (data: Uint8Array) => transport.writeWithoutResponse(BRIDGE_CHAR.dfuPacket, data);
+  // Activate+Reset only. Command (no response), and a transport error here is
+  // the success path, not a failure: the watch resets mid-write and the link
+  // drops. See the header note.
+  const ctrlNoResponse = async (bytes: number[]) => {
+    try {
+      await transport.writeWithoutResponse(BRIDGE_CHAR.dfuControl, new Uint8Array(bytes));
+    } catch {
+      // The watch rebooted before acknowledging — exactly what we asked it to do.
+    }
+  };
 
   try {
-    onProgress?.({ phase: 'start', sent: 0, total });
+    report('start', 0);
 
     // 1. Start DFU (application image).
     await ctrl([OP_START, IMAGE_TYPE_APP]);
@@ -80,24 +112,26 @@ export async function runDfu(
     await inbox.wait(isResponse(OP_START, ERR_NO_ERROR));
 
     // 3. Init packet (the .dat, carrying the CRC the watch validates against).
-    onProgress?.({ phase: 'init', sent: 0, total });
+    report('init', 0);
     await ctrl([OP_INIT_PARAMS, 0x00]); // begin init
     await packet(datFile);
     await ctrl([OP_INIT_PARAMS, 0x01]); // init complete
     await inbox.wait(isResponse(OP_INIT_PARAMS, ERR_NO_ERROR));
 
     // 4. Packet-receipt-notification interval (must be nonzero), then start data.
+    //    Both belong to the transfer, so the phase moves before them — a failure
+    //    here is a transfer failure, not an init one.
+    report('transfer', 0);
     await ctrl([OP_PRN_REQUEST, PRN_INTERVAL]);
     await ctrl([OP_RECEIVE_IMAGE]);
 
     // 5. Stream the firmware in 20-byte chunks. PRN notifications ([0x11, …])
     //    arrive every PRN_INTERVAL packets — informational, used for progress.
-    onProgress?.({ phase: 'transfer', sent: 0, total });
     for (let offset = 0; offset < total; offset += CHUNK) {
       await packet(binFile.subarray(offset, Math.min(offset + CHUNK, total)));
       const sent = Math.min(offset + CHUNK, total);
       if ((sent / CHUNK) % PRN_INTERVAL === 0 || sent === total) {
-        onProgress?.({ phase: 'transfer', sent, total });
+        report('transfer', sent);
       }
     }
     // Firmware sends [0x10,0x03,0x01] once every byte is received.
@@ -108,7 +142,7 @@ export async function runDfu(
     //    and resets the watch to Idle, so a timeout here means the image was
     //    rejected. The explicit ERR_CRC branch is defensive for firmwares that
     //    do send it.
-    onProgress?.({ phase: 'validate', sent: total, total });
+    report('validate', total);
     await ctrl([OP_VALIDATE]);
     let validation: Uint8Array;
     try {
@@ -129,8 +163,15 @@ export async function runDfu(
     }
 
     // 7. Activate + reset. The watch reboots into the new (unvalidated) image.
-    onProgress?.({ phase: 'activate', sent: total, total });
-    await ctrl([OP_ACTIVATE_RESET]);
+    report('activate', total);
+    await ctrlNoResponse([OP_ACTIVATE_RESET]);
+  } catch (e) {
+    // DfuAbortedError already explains itself; anything else is a raw GATT
+    // message with no context, so name the step it came from.
+    if (e instanceof DfuAbortedError) {
+      throw e;
+    }
+    throw new Error(`Failed while ${PHASE_LABEL[phase]}: ${(e as Error).message}`);
   } finally {
     unsubscribe();
   }
