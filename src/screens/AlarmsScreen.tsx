@@ -16,7 +16,6 @@ import { readAlarms, setAlarm, setAlarmEnabled } from '../ble/multiAlarmSync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Alarms'>;
 
-
 export function AlarmsScreen({ route }: Props) {
   const { watches } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
@@ -84,6 +83,7 @@ export function AlarmsScreen({ route }: Props) {
   };
 
   const openEditor = (index: number, alarm: Alarm) => {
+    setPickerOpen(false); // never inherit a previous row's open picker
     setDraftHour(alarm.hour);
     setDraftMinute(alarm.minute);
     setDraftDaily(alarm.mode === 'daily');
