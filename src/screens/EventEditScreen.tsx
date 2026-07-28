@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
+import { formatWeekdayDateTime } from '../util/formatTime';
 import { useWatchStore } from '../storage/store';
 import { newItemId, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
@@ -161,7 +162,7 @@ export function EventEditScreen({ navigation, route }: Props) {
       ) : (
         preview.map((d) => (
           <Text key={d.toISOString()} style={styles.preview}>
-            {d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {formatWeekdayDateTime(d)}
           </Text>
         ))
       )}

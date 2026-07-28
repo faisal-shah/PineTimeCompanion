@@ -3,6 +3,7 @@ package dev.faisal.pinetimecompanion.notifyfwd
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.text.format.DateFormat
 import androidx.core.app.NotificationManagerCompat
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
@@ -59,6 +60,12 @@ class NotificationForwarderModule : Module() {
 
     AsyncFunction("isNotificationAccessGranted") {
       NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+    }
+
+    // The phone's system-wide "Use 24-hour format" toggle. JS Intl follows the
+    // *locale*, which disagrees with this whenever the user has overridden it.
+    Function("is24HourFormat") {
+      DateFormat.is24HourFormat(context)
     }
 
     Function("openNotificationAccessSettings") {

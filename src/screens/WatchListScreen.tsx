@@ -5,6 +5,7 @@ import { VersionFooter } from '../ui/VersionFooter';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
+import { formatDateTime } from '../util/formatTime';
 import { newWatch, useWatchStore } from '../storage/store';
 import { needsSync } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
@@ -22,7 +23,7 @@ function syncStatus(watch: Watch): { label: string; color: string } {
   if (needsSync(watch.schedule) || needsSync(watch.tasks)) {
     return { label: 'changes not synced', color: colors.warn };
   }
-  return { label: `synced ${watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleString() : ''}`, color: colors.accent };
+  return { label: `synced ${watch.lastSyncAt ? formatDateTime(new Date(watch.lastSyncAt)) : ''}`, color: colors.accent };
 }
 
 export function WatchListScreen({ navigation }: Props) {

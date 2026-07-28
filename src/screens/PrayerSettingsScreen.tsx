@@ -4,12 +4,13 @@ import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Location from 'expo-location';
 import { RootStackParamList } from '../navigation';
+import { formatMinutesOfDay } from '../util/formatTime';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
 import { Button } from '../ui/Button';
 import { AsrMadhab, PrayerMethod, PrayerSettings } from '../model/types';
-import { computePrayerTimes, formatMinutes, PRAYERS } from '../model/prayerTimes';
+import { computePrayerTimes, PRAYERS } from '../model/prayerTimes';
 import { WireSettings } from '../ble/prayerProtocol';
 import { readPrayerSettings, writePrayerSettings } from '../ble/syncManager';
 import { makeTransport } from '../ble/transportFactory';
@@ -282,7 +283,7 @@ export function PrayerSettingsScreen({ route }: Props) {
             <View key={p} style={styles.previewRow}>
               <Text style={[styles.preview, highlight && styles.previewNext]}>{PRAYER_LABELS[p]}</Text>
               <Text style={[styles.preview, highlight && styles.previewNext]}>
-                {m === undefined ? '--:--' : `${preview.estimated[p] ? '~' : ''}${formatMinutes(m)}`}
+                {m === undefined ? '--:--' : `${preview.estimated[p] ? '~' : ''}${formatMinutesOfDay(m)}`}
               </Text>
             </View>
           );

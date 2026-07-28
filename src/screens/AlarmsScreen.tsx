@@ -6,6 +6,7 @@ import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
+import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
 import { makeTransport } from '../ble/transportFactory';
 import { Alarm, MultiAlarmState } from '../ble/multiAlarmProtocol';
@@ -13,7 +14,6 @@ import { readAlarms, setAlarm, setAlarmEnabled } from '../ble/multiAlarmSync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Alarms'>;
 
-const pad = (n: number) => String(n).padStart(2, '0');
 
 export function AlarmsScreen({ route }: Props) {
   const { watches } = useWatchStore();
@@ -160,9 +160,7 @@ export function AlarmsScreen({ route }: Props) {
                 testID={`alarm-toggle-${index}`}
               />
               <Pressable style={styles.rowMain} onPress={() => openEditor(index, alarm)} testID={`alarm-edit-${index}`}>
-                <Text style={[styles.time, !alarm.enabled && styles.dim]}>
-                  {pad(alarm.hour)}:{pad(alarm.minute)}
-                </Text>
+                <Text style={[styles.time, !alarm.enabled && styles.dim]}>{formatTime(alarm.hour, alarm.minute)}</Text>
                 <Text style={styles.mode}>{alarm.mode === 'daily' ? 'Daily' : 'Once'}</Text>
               </Pressable>
             </View>

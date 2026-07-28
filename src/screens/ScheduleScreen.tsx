@@ -7,6 +7,7 @@ import { useWatchStore } from '../storage/store';
 import { needsSync, syncedList, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { useCapStyle } from '../ui/Screen';
+import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
 import { useWatchOp } from '../ui/useWatchOp';
 import { describeRule } from '../model/types';
@@ -99,9 +100,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate('EventEdit', { watchId: watch.id, eventId: item.id })}
             onLongPress={() => deleteEvent(item.id)}
             testID={`event-${item.title}`}>
-            <Text style={styles.eventTime}>
-              {String(item.hour).padStart(2, '0')}:{String(item.minute).padStart(2, '0')}
-            </Text>
+            <Text style={styles.eventTime}>{formatTime(item.hour, item.minute)}</Text>
             <View style={{ flex: 1, marginLeft: spacing(2) }}>
               <Text style={[styles.eventTitle, !item.enabled && styles.disabled]}>{item.title}</Text>
               <Text style={styles.eventRule}>{describeRule(item.rule)}</Text>
