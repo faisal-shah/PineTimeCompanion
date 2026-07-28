@@ -5,6 +5,7 @@ import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
+import { Hint } from '../ui/Hint';
 import { Button } from '../ui/Button';
 import { showAlert } from '../ui/alert';
 import { makeTransport, isSimulatorDeviceId } from '../ble/transportFactory';
@@ -33,6 +34,8 @@ export function UpdateScreen({ route }: Props) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [validateFor, setValidateFor] = useState<string | null>(null);
+  const [readingRev, setReadingRev] = useState(false);
+  const [revError, setRevError] = useState<string | null>(null);
 
   const deviceId = watch?.deviceId;
   const paired = !!deviceId;
@@ -63,12 +66,20 @@ export function UpdateScreen({ route }: Props) {
     void saveUpdateSettings({ showPrereleases: value });
   };
 
+  // A full connect -> read -> disconnect with a 15s connect timeout, so it can
+  // sit silent for seconds on screen entry. Show that it is working, and say
+  // why it failed instead of rendering a bare dash.
   const readRevision = useCallback(async () => {
     if (!deviceId) return;
+    setReadingRev(true);
+    setRevError(null);
     try {
       setFirmwareRev(await readFirmwareRevision(makeTransport(deviceId), deviceId));
-    } catch {
+    } catch (e) {
       setFirmwareRev(null);
+      setRevError((e as Error).message);
+    } finally {
+      setReadingRev(false);
     }
   }, [deviceId]);
 
@@ -173,15 +184,23 @@ export function UpdateScreen({ route }: Props) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Installed firmware</Text>
           <View style={styles.revRow}>
-            <Text style={styles.rev} testID="current-firmware">
-              {firmwareRev ?? (paired ? '—' : 'Not paired')}
-            </Text>
+            {readingRev ? (
+              <View style={styles.revBusy} testID="reading-firmware">
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.revBusyText}>Reading from the watch…</Text>
+              </View>
+            ) : (
+              <Text style={styles.rev} testID="current-firmware">
+                {firmwareRev ?? (paired ? '—' : 'Not paired')}
+              </Text>
+            )}
             {paired && (
-              <Pressable onPress={() => void readRevision()} testID="reread-firmware">
-                <Text style={styles.link}>Re-read</Text>
+              <Pressable onPress={() => void readRevision()} disabled={readingRev} testID="reread-firmware">
+                <Text style={[styles.link, readingRev && styles.linkDisabled]}>Re-read</Text>
               </Pressable>
             )}
           </View>
+          {revError !== null && !readingRev && <Hint testID="rev-error">Couldn&rsquo;t read it: {revError}</Hint>}
         </View>
 
         {/* Repo source */}
@@ -323,6 +342,9 @@ export function UpdateScreen({ route }: Props) {
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(1.5) },
   cardLabel: { color: colors.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  revBusy: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
+  revBusyText: { color: colors.textDim, fontSize: 14 },
+  linkDisabled: { opacity: 0.4 },
   revRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing(0.5) },
   rev: { color: colors.text, fontSize: 22, fontWeight: '700' },
   link: { color: colors.accent, fontSize: 14, fontWeight: '600' },

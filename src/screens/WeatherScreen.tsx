@@ -93,7 +93,7 @@ export function WeatherScreen({ route }: Props) {
         </View>
       )}
 
-      {busy && !data && <ActivityIndicator color={colors.accent} style={{ marginTop: spacing(4) }} />}
+      {busy && <ActivityIndicator color={colors.accent} style={{ marginTop: spacing(4) }} />}
       {error && <Text style={styles.error} testID="weather-error">{error}</Text>}
 
       <Text style={styles.note}>

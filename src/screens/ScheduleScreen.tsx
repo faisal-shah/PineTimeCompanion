@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -126,7 +126,14 @@ export function ScheduleScreen({ navigation, route }: Props) {
           onPress={doSync}
           disabled={op.busy !== null}
           testID="sync-watch">
-          <Text style={styles.bigButtonText}>{op.busy !== null ? 'Syncing…' : needsSync(watch.schedule) ? 'Sync' : 'Synced ✓'}</Text>
+          {op.busy !== null ? (
+            <View style={styles.busyRow}>
+              <ActivityIndicator color={colors.onAccent} />
+              <Text style={styles.bigButtonText}>Syncing…</Text>
+            </View>
+          ) : (
+            <Text style={styles.bigButtonText}>{needsSync(watch.schedule) ? 'Sync' : 'Synced ✓'}</Text>
+          )}
         </Pressable>
       </View>
     </View>
@@ -135,6 +142,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  busyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   empty: { color: colors.textDim, textAlign: 'center', marginTop: spacing(6), lineHeight: 22 },
   eventCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(1) },
   eventTime: { color: colors.accent, fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },

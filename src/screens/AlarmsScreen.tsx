@@ -166,7 +166,7 @@ export function AlarmsScreen({ route }: Props) {
         )
       )}
 
-      {busy === 'Saving' && <Hint center>Syncing to the watch…</Hint>}
+      {busy !== null && state !== null && <Hint center>{busy === 'Saving' ? 'Syncing to the watch…' : 'Reading from the watch…'}</Hint>}
     </Screen>
   );
 }

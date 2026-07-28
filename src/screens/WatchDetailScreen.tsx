@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
@@ -202,9 +202,9 @@ export function WatchDetailScreen({ navigation, route }: Props) {
             label={paired ? 'Re-pair' : 'Pair'}
             onPress={() => navigation.navigate('WatchPair', { watchId: watch.id })}
           />
-          <ActionButton icon="🕑" label={op.busy === 'Set time' ? '…' : 'Set time'} onPress={doSetTime} disabled={op.busy !== null} />
-          <ActionButton icon="🔋" label={op.busy === 'Battery' ? '…' : 'Battery'} onPress={doBattery} disabled={op.busy !== null} />
-          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={op.busy !== null} />
+          <ActionButton icon="🕑" label="Set time" onPress={doSetTime} disabled={op.busy !== null} busy={op.busy === 'Set time'} />
+          <ActionButton icon="🔋" label="Battery" onPress={doBattery} disabled={op.busy !== null} busy={op.busy === 'Battery'} />
+          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={op.busy !== null} busy={op.busy === 'Message'} />
         </View>
 
         <View style={styles.deleteWrap}>
@@ -215,10 +215,22 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function ActionButton({ icon, label, onPress, disabled }: { icon: string; label: string; onPress: () => void; disabled?: boolean }) {
+function ActionButton({
+  icon,
+  label,
+  onPress,
+  disabled,
+  busy,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+}) {
   return (
-    <Pressable style={[styles.action, disabled && { opacity: 0.5 }]} onPress={onPress} disabled={disabled}>
-      <Text style={styles.actionIcon}>{icon}</Text>
+    <Pressable style={[styles.action, disabled === true && { opacity: 0.5 }]} onPress={onPress} disabled={disabled}>
+      {busy === true ? <ActivityIndicator color={colors.accent} style={styles.actionSpinner} /> : <Text style={styles.actionIcon}>{icon}</Text>}
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
   );
@@ -267,6 +279,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionIcon: { fontSize: 22 },
+  actionSpinner: { height: 26, justifyContent: 'center' },
   actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
 
   pending: { color: colors.warn, fontSize: 12, marginRight: spacing(1) },

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
@@ -117,7 +117,7 @@ export function TasksScreen({ route }: Props) {
 
   const saveStreak = () => {
     const value = Math.max(0, Math.min(0xffff, parseInt(streakText, 10) || 0));
-    setStreakOpen(false);
+    setStreakOpen(false); // op.busy drives the sync button's spinner from here
     return op.run('Streak update', async (deviceId) => {
       await setTaskStreak(makeTransport(deviceId), deviceId, value);
       upsertWatch({ ...watch, taskStreak: value });
@@ -172,7 +172,14 @@ export function TasksScreen({ route }: Props) {
           </Pressable>
         </View>
         <Pressable style={[styles.syncBtn, { backgroundColor: needsSync ? colors.accent : colors.accentDim }]} onPress={doSync} disabled={op.busy !== null} testID="sync-tasks">
-          <Text style={styles.syncBtnText}>{op.busy !== null ? 'Working…' : needsSync ? 'Sync to watch' : 'Synced ✓'}</Text>
+          {op.busy !== null ? (
+            <View style={styles.busyRow}>
+              <ActivityIndicator color={colors.onAccent} />
+              <Text style={styles.syncBtnText}>{op.busy}…</Text>
+            </View>
+          ) : (
+            <Text style={styles.syncBtnText}>{needsSync ? 'Sync to watch' : 'Synced ✓'}</Text>
+          )}
         </Pressable>
       </View>
 
@@ -201,6 +208,7 @@ export function TasksScreen({ route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  busyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   empty: { color: colors.textDim, textAlign: 'center', marginTop: spacing(6), lineHeight: 22 },
   streakRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(2) },
   streakLabel: { color: colors.text, fontSize: 16, fontWeight: '600' },
