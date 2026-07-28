@@ -8,6 +8,7 @@ import { colors, spacing } from '../ui/theme';
 import { Hint } from '../ui/Hint';
 import { Screen } from '../ui/Screen';
 import { formatTime } from '../util/formatTime';
+import { TimePicker } from '../ui/TimePicker';
 import { showAlert } from '../ui/alert';
 import { makeTransport } from '../ble/transportFactory';
 import { Alarm, MultiAlarmState } from '../ble/multiAlarmProtocol';
@@ -23,8 +24,9 @@ export function AlarmsScreen({ route }: Props) {
   const [state, setState] = useState<MultiAlarmState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
-  const [draftHour, setDraftHour] = useState('0');
-  const [draftMinute, setDraftMinute] = useState('0');
+  const [draftHour, setDraftHour] = useState(0);
+  const [draftMinute, setDraftMinute] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [draftDaily, setDraftDaily] = useState(false);
 
   const load = useCallback(async () => {
@@ -82,8 +84,8 @@ export function AlarmsScreen({ route }: Props) {
   };
 
   const openEditor = (index: number, alarm: Alarm) => {
-    setDraftHour(String(alarm.hour));
-    setDraftMinute(String(alarm.minute));
+    setDraftHour(alarm.hour);
+    setDraftMinute(alarm.minute);
     setDraftDaily(alarm.mode === 'daily');
     setEditing(index);
   };
@@ -92,10 +94,9 @@ export function AlarmsScreen({ route }: Props) {
     if (editing === null) {
       return;
     }
-    const hour = Math.max(0, Math.min(23, parseInt(draftHour, 10) || 0));
-    const minute = Math.max(0, Math.min(59, parseInt(draftMinute, 10) || 0));
+    // No clamping needed: the picker cannot yield an out-of-range time.
     // Editing an alarm enables it (matches the on-watch editor).
-    void runEdit(editing, { hour, minute, mode: draftDaily ? 'daily' : 'once', enabled: true });
+    void runEdit(editing, { hour: draftHour, minute: draftMinute, mode: draftDaily ? 'daily' : 'once', enabled: true });
   };
 
   return (
@@ -114,25 +115,21 @@ export function AlarmsScreen({ route }: Props) {
         state.alarms.map((alarm, index) =>
           editing === index ? (
             <View key={index} style={styles.card} testID={`alarm-editor-${index}`}>
-              <View style={styles.editRow}>
-                <TextInput
-                  style={styles.timeInput}
-                  value={draftHour}
-                  onChangeText={(t) => setDraftHour(t.replace(/\D/g, '').slice(0, 2))}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  testID={`alarm-hour-${index}`}
-                />
-                <Text style={styles.colon}>:</Text>
-                <TextInput
-                  style={styles.timeInput}
-                  value={draftMinute}
-                  onChangeText={(t) => setDraftMinute(t.replace(/\D/g, '').slice(0, 2))}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  testID={`alarm-minute-${index}`}
-                />
-              </View>
+              <Pressable style={styles.timeField} onPress={() => setPickerOpen(true)} testID={`alarm-time-${index}`}>
+                <Text style={styles.timeFieldText}>{formatTime(draftHour, draftMinute)}</Text>
+                <Text style={styles.timeFieldHint}>Tap to change</Text>
+              </Pressable>
+              <TimePicker
+                visible={pickerOpen}
+                hour={draftHour}
+                minute={draftMinute}
+                onCancel={() => setPickerOpen(false)}
+                onConfirm={(h, m) => {
+                  setDraftHour(h);
+                  setDraftMinute(m);
+                  setPickerOpen(false);
+                }}
+              />
               <View style={styles.editRow}>
                 <Text style={styles.modeLabel}>Repeat daily</Text>
                 <Switch
@@ -190,19 +187,11 @@ const styles = StyleSheet.create({
   time: { color: colors.text, fontSize: 28, fontWeight: '700', fontVariant: ['tabular-nums'] },
   dim: { color: colors.textDim },
   mode: { color: colors.textDim, fontSize: 14 },
+  timeField: { backgroundColor: colors.background, borderRadius: 12, paddingVertical: spacing(2), alignItems: 'center' },
+  timeFieldText: { color: colors.text, fontSize: 32, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  timeFieldHint: { color: colors.textDim, fontSize: 12, marginTop: spacing(0.5) },
   card: { backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(1) },
   editRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing(1.5) },
-  timeInput: {
-    backgroundColor: colors.background,
-    color: colors.text,
-    borderRadius: 10,
-    fontSize: 34,
-    fontWeight: '700',
-    textAlign: 'center',
-    width: 90,
-    paddingVertical: spacing(1),
-  },
-  colon: { color: colors.text, fontSize: 34, fontWeight: '700', marginHorizontal: spacing(1) },
   modeLabel: { color: colors.text, fontSize: 16 },
   editButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(2), marginTop: spacing(1) },
   secondary: { paddingVertical: spacing(1), paddingHorizontal: spacing(2) },

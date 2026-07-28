@@ -2,7 +2,10 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
-import { formatWeekdayDateTime } from '../util/formatTime';
+import { TimePicker } from '../ui/TimePicker';
+import { DatePicker } from '../ui/DatePicker';
+import { isoToDate } from '../util/isoDate';
+import { formatTime, formatWeekdayDateTime } from '../util/formatTime';
 import { useWatchStore } from '../storage/store';
 import { newItemId, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
@@ -39,6 +42,8 @@ export function EventEditScreen({ navigation, route }: Props) {
   const [dayOfMonth, setDayOfMonth] = useState(existing?.rule.dayOfMonth ?? 1);
   const [anchorDate, setAnchorDate] = useState(existing?.anchorDate ?? todayIso());
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
+  const [timeOpen, setTimeOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const draft: WatchEvent = useMemo(
     () => ({
@@ -89,11 +94,20 @@ export function EventEditScreen({ navigation, route }: Props) {
       />
 
       <Text style={styles.label}>Time</Text>
-      <View style={styles.row}>
-        <Stepper value={hour} setValue={setHour} min={0} max={23} width={2} testID="hour" />
-        <Text style={styles.timeColon}>:</Text>
-        <Stepper value={minute} setValue={setMinute} min={0} max={59} step={5} width={2} testID="minute" />
-      </View>
+      <Pressable style={styles.field} onPress={() => setTimeOpen(true)} testID="event-time">
+        <Text style={styles.fieldValue}>{formatTime(hour, minute)}</Text>
+      </Pressable>
+      <TimePicker
+        visible={timeOpen}
+        hour={hour}
+        minute={minute}
+        onCancel={() => setTimeOpen(false)}
+        onConfirm={(h, m) => {
+          setHour(h);
+          setMinute(m);
+          setTimeOpen(false);
+        }}
+      />
 
       <Text style={styles.label}>Repeats</Text>
       <View style={styles.segmentRow}>
@@ -142,13 +156,19 @@ export function EventEditScreen({ navigation, route }: Props) {
       )}
 
       <Text style={styles.label}>{kind === 'once' ? 'Date' : 'Starting from'}</Text>
-      <TextInput
-        style={styles.input}
+      <Pressable style={styles.field} onPress={() => setDateOpen(true)} testID="anchor-date">
+        <Text style={styles.fieldValue}>
+          {isoToDate(anchorDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+        </Text>
+      </Pressable>
+      <DatePicker
+        visible={dateOpen}
         value={anchorDate}
-        onChangeText={setAnchorDate}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={colors.textDim}
-        testID="anchor-date"
+        onCancel={() => setDateOpen(false)}
+        onConfirm={(iso) => {
+          setAnchorDate(iso);
+          setDateOpen(false);
+        }}
       />
 
       <View style={[styles.row, { justifyContent: 'space-between', marginTop: spacing(1) }]}>
@@ -207,6 +227,8 @@ function Stepper({
 const styles = StyleSheet.create({
   label: { color: colors.textDim, marginTop: spacing(2), marginBottom: spacing(1), fontSize: 13, textTransform: 'uppercase' },
   input: { backgroundColor: colors.card, color: colors.text, borderRadius: 10, paddingHorizontal: spacing(2), height: 48 },
+  field: { backgroundColor: colors.card, borderRadius: 12, paddingVertical: spacing(2), paddingHorizontal: spacing(2) },
+  fieldValue: { color: colors.text, fontSize: 18, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   timeColon: { color: colors.text, fontSize: 24, fontWeight: '700' },
   inlineLabel: { color: colors.text, fontSize: 15 },
