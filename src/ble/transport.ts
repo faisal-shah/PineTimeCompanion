@@ -66,17 +66,27 @@ export class TransportError extends Error {
  * exclusive), so this is the single place that owns that lifecycle.
  * `mtu` is requested when given; the caller checks the negotiated value.
  */
+/**
+ * Enough for every message the app sends. Negotiated by default because the
+ * ATT default of 23 leaves a 20-byte payload, which silently truncates the
+ * weather messages (53 and 36 bytes), a watch message (up to 100) and the
+ * Find My key (28) — the watch then parses whatever it did receive. This is
+ * invisible in the simulator (the TCP bridge has no MTU) and on the web
+ * (Chrome negotiates a large MTU itself), so it only shows on real hardware.
+ */
+export const DEFAULT_MTU = 256;
+
 export async function withConnection<T>(
   transport: WatchTransport,
   deviceId: string,
   fn: () => Promise<T>,
-  mtu?: number,
+  mtu: number = DEFAULT_MTU,
 ): Promise<T> {
   await transport.connect(deviceId);
   try {
-    if (mtu !== undefined) {
-      await transport.requestMtu(mtu);
-    }
+    // Best-effort: a watch that refuses still handles the short writes, so
+    // don't fail the whole operation over it.
+    await transport.requestMtu(mtu).catch(() => undefined);
     return await fn();
   } finally {
     await transport.disconnect().catch(() => undefined);
