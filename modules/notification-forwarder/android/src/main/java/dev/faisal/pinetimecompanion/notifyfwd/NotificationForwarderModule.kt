@@ -1,7 +1,10 @@
 package dev.faisal.pinetimecompanion.notifyfwd
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.core.app.NotificationManagerCompat
@@ -68,8 +71,27 @@ class NotificationForwarderModule : Module() {
       DateFormat.is24HourFormat(context)
     }
 
+    // Prefer this app's own listener page (API 30+); the global list makes the
+    // user hunt for us among every installed app.
     Function("openNotificationAccessSettings") {
-      val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+      val component = ComponentName(context, NotifListenerService::class.java).flattenToString()
+      val direct = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+        .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, component)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val fallback = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val target = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        direct.resolveActivity(context.packageManager) != null
+      ) direct else fallback
+      context.startActivity(target)
+    }
+
+    // App info -> the overflow menu here is the only place "Allow restricted
+    // settings" appears, and Android 13+ hides notification access behind it
+    // for any sideloaded app.
+    Function("openAppInfoSettings") {
+      val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        .setData(Uri.fromParts("package", context.packageName, null))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       context.startActivity(intent)
     }

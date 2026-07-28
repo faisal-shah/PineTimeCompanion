@@ -18,6 +18,11 @@ export function openNotificationAccessSettings(): void {
   Native.openNotificationAccessSettings();
 }
 
+/** App info, where Android 13+ hides "Allow restricted settings". */
+export function openAppInfoSettings(): void {
+  Native.openAppInfoSettings();
+}
+
 export function getInstalledApps(): Promise<InstalledApp[]> {
   return Native.getInstalledApps();
 }

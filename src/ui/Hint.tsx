@@ -29,6 +29,8 @@ export function Hint({
 }
 
 const styles = StyleSheet.create({
-  hint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing(1) },
+  // Horizontal padding matters: these often sit outside a list's padded content
+  // container and would otherwise run edge to edge.
+  hint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing(1), paddingHorizontal: spacing(2) },
   center: { textAlign: 'center' },
 });

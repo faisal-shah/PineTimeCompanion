@@ -15,6 +15,8 @@ export function isNotificationAccessGranted(): Promise<boolean> {
 
 export function openNotificationAccessSettings(): void {}
 
+export function openAppInfoSettings(): void {}
+
 export function getInstalledApps(): Promise<InstalledApp[]> {
   return Promise.resolve([]);
 }

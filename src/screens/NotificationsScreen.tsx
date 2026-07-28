@@ -6,6 +6,7 @@ import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
+import { Hint } from '../ui/Hint';
 import {
   forwarderAvailable,
   getInstalledApps,
@@ -13,6 +14,7 @@ import {
   isNotificationAccessGranted,
   onNowPlaying,
   openNotificationAccessSettings,
+  openAppInfoSettings,
   syncForwarderConfig,
 } from '../notifications/forwarder';
 import type { InstalledApp, NowPlaying } from '../../modules/notification-forwarder';
@@ -24,7 +26,8 @@ export function NotificationsScreen({ route }: Props) {
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
-  const [granted, setGranted] = useState(true);
+  const [granted, setGranted] = useState<boolean | null>(null);
+  const [triedSettings, setTriedSettings] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [forwardCalls, setForwardCalls] = useState(true);
   const [allowed, setAllowed] = useState<string[]>([]);
@@ -105,15 +108,43 @@ export function NotificationsScreen({ route }: Props) {
 
   return (
     <Screen width="read">
-      {!granted && (
+      {granted === false && (
         <View style={styles.banner} testID="access-banner">
           <Text style={styles.bannerTitle}>Notification access needed</Text>
           <Text style={styles.bannerBody}>
-            To forward your phone's notifications, grant this app Notification Access in system settings.
+            Grant this app Notification Access in system settings. It powers all three of: forwarding your
+            notifications, ringing the watch on incoming calls, and showing what&rsquo;s playing with the music
+            controls.
           </Text>
-          <Pressable style={styles.bannerButton} onPress={openNotificationAccessSettings} testID="open-access">
+          <Pressable
+            style={styles.bannerButton}
+            onPress={() => {
+              setTriedSettings(true);
+              openNotificationAccessSettings();
+            }}
+            testID="open-access">
             <Text style={styles.bannerButtonText}>Open settings</Text>
           </Pressable>
+
+          {/* Android 13+ greys out notification access for anything installed
+              outside the Play Store until restricted settings are unlocked, and
+              the unlock is buried in App info's overflow menu. Only worth
+              showing once the plain route has visibly failed. */}
+          {triedSettings && (
+            <View style={styles.restricted} testID="restricted-help">
+              <Text style={styles.bannerTitle}>Says &ldquo;Restricted setting&rdquo;?</Text>
+              <Text style={styles.bannerBody}>
+                Android blocks this for apps installed outside the Play Store. To unlock it:{'\n'}
+                1. Tap the greyed-out switch, then OK.{'\n'}
+                2. Open App info below.{'\n'}
+                3. Tap ⋮ (top right) → Allow restricted settings.{'\n'}
+                4. Come back and grant access.
+              </Text>
+              <Pressable style={styles.bannerButton} onPress={openAppInfoSettings} testID="open-app-info">
+                <Text style={styles.bannerButtonText}>Open App info</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 
@@ -131,12 +162,18 @@ export function NotificationsScreen({ route }: Props) {
       </View>
 
       {watch.forwardNotifications && (
-        <View style={styles.nowPlayingRow} testID="now-playing">
-          <Text style={styles.nowPlayingIcon}>{playingLabel ? '🎵' : '🎧'}</Text>
-          <Text style={styles.nowPlayingText} numberOfLines={1}>
-            {playingLabel ?? 'Nothing playing'}
-          </Text>
-        </View>
+        <>
+          <View style={styles.nowPlayingRow} testID="now-playing">
+            <Text style={styles.nowPlayingIcon}>{playingLabel ? '🎵' : '🎧'}</Text>
+            <Text style={styles.nowPlayingText} numberOfLines={1}>
+              {playingLabel ?? 'Nothing playing'}
+            </Text>
+          </View>
+          <Hint>
+            What&rsquo;s playing and the watch&rsquo;s music controls come from Notification Access alone — the app list
+            below doesn&rsquo;t affect them.
+          </Hint>
+        </>
       )}
 
       <View style={styles.row}>
@@ -146,9 +183,16 @@ export function NotificationsScreen({ route }: Props) {
         </View>
         <Switch value={forwardCalls} onValueChange={toggleCalls} testID="toggle-calls" />
       </View>
+      <Hint>
+        This covers ringing calls from any dialer on its own — you don&rsquo;t need to pick a phone app below. Missed
+        calls and voicemail are ordinary notifications, so tick your dialer in the list if you want those too.
+      </Hint>
 
       <Text style={styles.sectionLabel}>Apps to forward</Text>
-      <Text style={styles.sectionHint}>Only notifications from the apps you pick are forwarded. Applies to every watch with forwarding on.</Text>
+      <Text style={styles.sectionHint}>
+        Notifications are forwarded only from the apps you pick here (incoming calls are the exception — they use the
+        switch above). Applies to every watch with forwarding on.
+      </Text>
       <TextInput
         style={styles.search}
         value={query}
@@ -184,6 +228,7 @@ const styles = StyleSheet.create({
   androidOnly: { color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   androidOnlySub: { color: colors.textDim, fontSize: 14, textAlign: 'center', marginTop: spacing(1), lineHeight: 20 },
 
+  restricted: { marginTop: spacing(2), borderTopWidth: 1, borderTopColor: colors.textDim, paddingTop: spacing(2) },
   banner: { backgroundColor: '#2a2410', borderWidth: 1, borderColor: colors.warn, borderRadius: 12, padding: spacing(2), marginBottom: spacing(2) },
   bannerTitle: { color: colors.warn, fontSize: 15, fontWeight: '700' },
   bannerBody: { color: colors.text, fontSize: 14, lineHeight: 20, marginTop: spacing(0.5) },

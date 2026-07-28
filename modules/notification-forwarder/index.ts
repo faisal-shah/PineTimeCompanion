@@ -57,6 +57,7 @@ declare class NotificationForwarderModule extends NativeModule<ForwarderEvents> 
   getConfig(): Promise<ForwarderConfig>;
   isNotificationAccessGranted(): Promise<boolean>;
   openNotificationAccessSettings(): void;
+  openAppInfoSettings(): void;
   is24HourFormat(): boolean;
   getInstalledApps(): Promise<InstalledApp[]>;
   getStatus(): Promise<ForwarderStatus>;

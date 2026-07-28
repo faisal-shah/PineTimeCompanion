@@ -49,6 +49,18 @@ class NotificationFilterTest {
   }
 
   @Test
+  fun `a missed call is an ordinary notification and needs the dialer allowlisted`() {
+    // isCall mirrors Notification.CATEGORY_CALL, which a *ringing* call sets and
+    // a missed-call/voicemail post does not. So the calls switch alone is not
+    // enough for those -- the UI says as much, and this pins it.
+    val missed = notif(pkg = "com.android.dialer", title = "Missed call", text = "Mom", isCall = false)
+    assertEquals("not-allowed", (filter().decide(missed, allowed, forwardCalls = true, nowMs = 1000) as Decision.Drop).reason)
+
+    val withDialerAllowed = allowed + "com.android.dialer"
+    assertTrue(filter().decide(missed, withDialerAllowed, forwardCalls = false, nowMs = 1000) is Decision.ForwardNotification)
+  }
+
+  @Test
   fun `an ongoing call still forwards (calls are exempt from the ongoing drop)`() {
     val d = filter().decide(notif(title = "Mom", isCall = true, isOngoing = true), allowed, true, 1000)
     assertEquals(Decision.ForwardCall("Mom"), d)
