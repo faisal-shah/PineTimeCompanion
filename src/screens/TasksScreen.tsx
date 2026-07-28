@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { useWatchStore } from '../storage/store';
 import { WatchTask } from '../model/types';
 import { needsSync as listNeedsSync, newItemId, syncedList, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
+import { Hint } from '../ui/Hint';
 import { useCapStyle } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
 import { TextPrompt } from '../ui/Dialog';
@@ -72,22 +74,11 @@ export function TasksScreen({ route }: Props) {
     ]);
   };
 
-  // Reorder by swapping the two tasks' order fields (both count as edits).
-  const move = (index: number, dir: -1 | 1) => {
-    const j = index + dir;
-    if (j < 0 || j >= tasks.length) {
-      return;
-    }
-    const a = tasks[index];
-    const b = tasks[j];
+  // Renumber to the dropped positions. Only rows whose order actually moved are
+  // restamped, so a drag doesn't mark the whole list as edited for the merge.
+  const reorder = (dropped: WatchTask[]) => {
     const now = nowSec();
-    save(
-      tasks.map((t) => {
-        if (t.id === a.id) return { ...t, order: b.order, lastModified: now };
-        if (t.id === b.id) return { ...t, order: a.order, lastModified: now };
-        return t;
-      }),
-    );
+    save(dropped.map((t, i) => (t.order === i ? t : { ...t, order: i, lastModified: now })));
   };
 
   const applySync = (result: Awaited<ReturnType<typeof syncTasks>>) => {
@@ -135,9 +126,10 @@ export function TasksScreen({ route }: Props) {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <DraggableFlatList
         data={tasks}
         keyExtractor={(t) => String(t.id)}
+        onDragEnd={({ data }) => reorder(data)}
         contentContainerStyle={[{ padding: spacing(2) }, cap]}
         ListEmptyComponent={<Text style={styles.empty}>No tasks yet. Add the first one below.{'\n'}The watch shows them every day to tick off.</Text>}
         ListHeaderComponent={
@@ -147,22 +139,20 @@ export function TasksScreen({ route }: Props) {
             <Text style={styles.streakEdit}>Edit</Text>
           </Pressable>
         }
-        renderItem={({ item, index }) => (
-          <View style={styles.taskCard}>
+        renderItem={({ item, drag, isActive }: RenderItemParams<WatchTask>) => (
+          <View style={[styles.taskCard, isActive && styles.taskCardActive]}>
             <Pressable style={styles.taskMain} onPress={() => { setEditing(item); setEditText(item.title); }} onLongPress={() => remove(item)} testID={`task-${item.title}`}>
               <Text style={styles.taskTitle} numberOfLines={1}>{item.title}</Text>
             </Pressable>
-            <Pressable style={styles.arrow} onPress={() => move(index, -1)} disabled={index === 0} testID={`up-${item.title}`}>
-              <Text style={[styles.arrowText, index === 0 && styles.arrowDisabled]}>▲</Text>
-            </Pressable>
-            <Pressable style={styles.arrow} onPress={() => move(index, 1)} disabled={index === tasks.length - 1} testID={`down-${item.title}`}>
-              <Text style={[styles.arrowText, index === tasks.length - 1 && styles.arrowDisabled]}>▼</Text>
+            <Pressable style={styles.handle} onPressIn={drag} testID={`drag-${item.title}`} accessibilityLabel={`Reorder ${item.title}`}>
+              <Text style={styles.handleText}>≡</Text>
             </Pressable>
           </View>
         )}
       />
 
-      <Text style={styles.slots} testID="slots-used">{tasks.length} of {capacity} tasks · tap to rename, long-press to delete</Text>
+      <Text style={styles.slots} testID="slots-used">{tasks.length} of {capacity} tasks</Text>
+      <Hint center>Tap a task to rename it · press and hold to delete · drag the handle to reorder</Hint>
 
       <View style={[styles.footer, cap, { paddingBottom: spacing(2) + insets.bottom }]}>
         <View style={styles.addRow}>
@@ -219,9 +209,9 @@ const styles = StyleSheet.create({
   taskCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, marginBottom: spacing(1) },
   taskMain: { flex: 1, padding: spacing(2) },
   taskTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  arrow: { paddingHorizontal: spacing(1.5), paddingVertical: spacing(2) },
-  arrowText: { color: colors.accent, fontSize: 16 },
-  arrowDisabled: { color: colors.textDim, opacity: 0.4 },
+  taskCardActive: { opacity: 0.92, borderWidth: 1, borderColor: colors.accent },
+  handle: { paddingHorizontal: spacing(2), paddingVertical: spacing(2) },
+  handleText: { color: colors.textDim, fontSize: 22, lineHeight: 24 },
   slots: { color: colors.textDim, fontSize: 12, textAlign: 'center', paddingVertical: spacing(0.5) },
   footer: { padding: spacing(2), paddingTop: spacing(1), gap: spacing(1) },
   addRow: { flexDirection: 'row', gap: spacing(1) },

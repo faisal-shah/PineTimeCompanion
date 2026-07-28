@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Hint } from '../ui/Hint';
 import { Screen } from '../ui/Screen';
 import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
@@ -52,7 +53,7 @@ export function AlarmsScreen({ route }: Props) {
   if (!watch.deviceId) {
     return (
       <Screen width="read">
-        <Text style={styles.hint}>Pair this watch first (from its watch screen) to manage alarms.</Text>
+        <Hint center>Pair this watch first (from its watch screen) to manage alarms.</Hint>
       </Screen>
     );
   }
@@ -107,7 +108,7 @@ export function AlarmsScreen({ route }: Props) {
       {state === null ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
-          <Text style={styles.hint}>{busy === 'Loading' ? 'Reading alarms from the watch…' : 'No data'}</Text>
+          <Hint center>{busy === 'Loading' ? 'Reading alarms from the watch…' : 'No data'}</Hint>
         </View>
       ) : (
         state.alarms.map((alarm, index) =>
@@ -168,7 +169,7 @@ export function AlarmsScreen({ route }: Props) {
         )
       )}
 
-      {busy === 'Saving' && <Text style={styles.hint}>Syncing to the watch…</Text>}
+      {busy === 'Saving' && <Hint center>Syncing to the watch…</Hint>}
     </Screen>
   );
 }
@@ -208,5 +209,4 @@ const styles = StyleSheet.create({
   secondaryText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
   save: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing(1), paddingHorizontal: spacing(3) },
   saveText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  hint: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginTop: spacing(1) },
 });

@@ -7,6 +7,7 @@ import { useWatchStore } from '../storage/store';
 import { needsSync, syncedList, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { useCapStyle } from '../ui/Screen';
+import { Hint } from '../ui/Hint';
 import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
 import { useWatchOp } from '../ui/useWatchOp';
@@ -112,6 +113,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
       <Text style={styles.slots} testID="slots-used">
         {watch.schedule.items.length} of {capacity} slots used
       </Text>
+      <Hint center>Tap an event to edit it · press and hold to delete</Hint>
       <View style={[styles.bottomRow, cap, { paddingBottom: spacing(2) + insets.bottom }]}>
         <Pressable
           style={[styles.bigButton, { backgroundColor: colors.card }, atCapacity && { opacity: 0.5 }]}

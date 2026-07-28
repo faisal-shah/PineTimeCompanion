@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { colors, spacing } from '../ui/theme';
+import { Hint } from '../ui/Hint';
 import { Screen } from '../ui/Screen';
 import { Button } from '../ui/Button';
 import { DEFAULT_MAP_STYLE_URL, getFindMySettings, saveFindMySettings } from '../storage/findMySettings';
@@ -40,10 +41,10 @@ export function FindMySettingsScreen() {
         placeholder={DEFAULT_MAP_STYLE_URL}
         placeholderTextColor={colors.textDim}
       />
-      <Text style={styles.hint}>
+      <Hint>
         A MapLibre style JSON URL. Default is OpenFreeMap (no signup). To use MapTiler, paste its style URL including your
         ?key=… — e.g. https://api.maptiler.com/maps/streets-v2/style.json?key=YOURKEY
-      </Text>
+      </Hint>
       <Pressable onPress={() => setMapStyleUrl(DEFAULT_MAP_STYLE_URL)}>
         <Text style={styles.reset}>Reset to OpenFreeMap</Text>
       </Pressable>
@@ -59,10 +60,10 @@ export function FindMySettingsScreen() {
         placeholder={DEFAULT_ANISETTE_SERVERS.join('\n')}
         placeholderTextColor={colors.textDim}
       />
-      <Text style={styles.hint}>
+      <Hint>
         Extra https anisette-v3 servers tried before the built-in SideStore list — e.g. point at your own self-hosted
         instance. Leave blank to use the defaults. Public servers can be down; the app falls back across them.
-      </Text>
+      </Hint>
 
       <Button label={saved ? 'Saved ✓' : 'Save'} onPress={save} style={{ marginTop: spacing(3) }} />
     </Screen>
@@ -73,6 +74,5 @@ const styles = StyleSheet.create({
   label: { color: colors.textDim, marginBottom: spacing(0.5), fontSize: 13, textTransform: 'uppercase' },
   input: { backgroundColor: colors.card, borderRadius: 10, minHeight: 48, paddingHorizontal: spacing(1.5), paddingVertical: spacing(1), color: colors.text, fontSize: 14 },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
-  hint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing(1) },
   reset: { color: colors.accent, fontSize: 14, marginTop: spacing(1), fontWeight: '600' },
 });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './src/navigation';
@@ -32,28 +33,31 @@ export default function App() {
   }
 
   return (
-    <WatchStoreContext.Provider value={store}>
-      <NavigationContainer theme={navTheme}>
-        <StatusBar style="light" />
-        <Stack.Navigator screenOptions={stackScreenOptions}>
-          <Stack.Screen name="WatchList" component={WatchListScreen} options={{ title: 'PineTime Companion' }} />
-          <Stack.Screen name="WatchDetail" component={WatchDetailScreen} options={{ title: 'Watch' }} />
-          <Stack.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Schedule' }} />
-          <Stack.Screen name="Tasks" component={TasksScreen} options={{ title: 'Daily tasks' }} />
-          <Stack.Screen name="EventEdit" component={EventEditScreen} options={{ title: 'Event' }} />
-          <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
-          <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
-          <Stack.Screen name="Alarms" component={AlarmsScreen} options={{ title: 'Alarms' }} />
-          <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
-          <Stack.Screen name="Update" component={UpdateScreen} options={{ title: 'Update watch' }} />
-          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
-          <Stack.Screen name="Weather" component={WeatherScreen} options={{ title: 'Weather' }} />
-          <Stack.Screen name="Steps" component={StepsScreen} options={{ title: 'Steps' }} />
-          <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
-          <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />
-          <Stack.Screen name="FindMySettings" component={FindMySettingsScreen} options={{ title: 'Find My settings' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </WatchStoreContext.Provider>
+    // GestureHandlerRootView must wrap everything for the draggable task list.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <WatchStoreContext.Provider value={store}>
+        <NavigationContainer theme={navTheme}>
+          <StatusBar style="light" />
+          <Stack.Navigator screenOptions={stackScreenOptions}>
+            <Stack.Screen name="WatchList" component={WatchListScreen} options={{ title: 'PineTime Companion' }} />
+            <Stack.Screen name="WatchDetail" component={WatchDetailScreen} options={{ title: 'Watch' }} />
+            <Stack.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Schedule' }} />
+            <Stack.Screen name="Tasks" component={TasksScreen} options={{ title: 'Daily tasks' }} />
+            <Stack.Screen name="EventEdit" component={EventEditScreen} options={{ title: 'Event' }} />
+            <Stack.Screen name="WatchPair" component={WatchPairScreen} options={{ title: 'Pair watch' }} />
+            <Stack.Screen name="PrayerSettings" component={PrayerSettingsScreen} options={{ title: 'Prayer times' }} />
+            <Stack.Screen name="Alarms" component={AlarmsScreen} options={{ title: 'Alarms' }} />
+            <Stack.Screen name="Beacon" component={BeaconScreen} options={{ title: 'Find My' }} />
+            <Stack.Screen name="Update" component={UpdateScreen} options={{ title: 'Update watch' }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+            <Stack.Screen name="Weather" component={WeatherScreen} options={{ title: 'Weather' }} />
+            <Stack.Screen name="Steps" component={StepsScreen} options={{ title: 'Steps' }} />
+            <Stack.Screen name="AppleLogin" component={AppleLoginScreen} options={{ title: 'Apple sign-in' }} />
+            <Stack.Screen name="FindMyMap" component={FindMyMapScreen} options={{ title: 'Location' }} />
+            <Stack.Screen name="FindMySettings" component={FindMySettingsScreen} options={{ title: 'Find My settings' }} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </WatchStoreContext.Provider>
+    </GestureHandlerRootView>
   );
 }

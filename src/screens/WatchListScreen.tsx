@@ -20,8 +20,11 @@ function syncStatus(watch: Watch): { label: string; color: string } {
   if (!watch.deviceId) {
     return { label: 'not paired', color: colors.textDim };
   }
-  if (needsSync(watch.schedule) || needsSync(watch.tasks)) {
-    return { label: 'changes not synced', color: colors.warn };
+  // Only the staged lists carry pending state: alarms are compare-and-swap and
+  // weather/prayer are push-only, so nothing else can be "not synced".
+  const pending = [needsSync(watch.schedule) && 'Schedule', needsSync(watch.tasks) && 'Tasks'].filter(Boolean) as string[];
+  if (pending.length > 0) {
+    return { label: `${pending.join(' + ')} not synced`, color: colors.warn };
   }
   return { label: `synced ${watch.lastSyncAt ? formatDateTime(new Date(watch.lastSyncAt)) : ''}`, color: colors.accent };
 }

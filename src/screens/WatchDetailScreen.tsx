@@ -4,6 +4,7 @@ import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
+import { needsSync } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
 import { CardGrid } from '../ui/CardGrid';
@@ -102,6 +103,11 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     ]);
   };
 
+  // Only the staged lists can be pending; alarms are compare-and-swap and
+  // weather/prayer are push-only. So this is the whole mapping.
+  const featurePending = (key: FeatureKey) =>
+    (key === 'Schedule' && needsSync(watch.schedule)) || (key === 'Tasks' && needsSync(watch.tasks));
+
   const featureSubtitle = (key: FeatureKey, fallback: string) => {
     if (key === 'Schedule') {
       const n = watch.schedule.items.length;
@@ -178,6 +184,11 @@ export function WatchDetailScreen({ navigation, route }: Props) {
                 <Text style={styles.featureTitle}>{f.title}</Text>
                 <Text style={styles.featureSubtitle}>{featureSubtitle(f.key, f.subtitle)}</Text>
               </View>
+              {featurePending(f.key) && (
+                <Text style={styles.pending} testID={`pending-${f.key}`}>
+                  not synced
+                </Text>
+              )}
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           ))}
@@ -258,6 +269,7 @@ const styles = StyleSheet.create({
   actionIcon: { fontSize: 22 },
   actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
 
+  pending: { color: colors.warn, fontSize: 12, marginRight: spacing(1) },
   deleteWrap: { marginTop: spacing(4) },
 
   composeInput: {

@@ -4,6 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
+import { Hint } from '../ui/Hint';
 import { Screen } from '../ui/Screen';
 import { Button } from '../ui/Button';
 import { showAlert } from '../ui/alert';
@@ -170,10 +171,10 @@ export function BeaconScreen({ route, navigation }: Props) {
 
       <Text style={styles.label}>4. Export keys for your server</Text>
       <Button variant="secondary" label="Export .keys file" onPress={exportKeys} disabled={!beacon} testID="beacon-export" />
-      <Text style={styles.hint}>
+      <Hint>
         The exported file (macless-haystack format) holds the private key — keep it safe. Load it into your macless-haystack
         instance to see this watch's location.
-      </Text>
+      </Hint>
 
       {Platform.OS !== 'web' && (
         <>
@@ -199,10 +200,10 @@ export function BeaconScreen({ route, navigation }: Props) {
           ) : (
             <Button variant="secondary" label="Sign in to Apple" onPress={() => navigation.navigate('AppleLogin')} testID="beacon-signin" />
           )}
-          <Text style={styles.hint}>
+          <Hint>
             Sign in with a burner Apple Account to pull this watch's crowd-sourced location from Apple's Find My network and
             show it on a map.
-          </Text>
+          </Hint>
         </>
       )}
     </Screen>
@@ -216,5 +217,4 @@ const styles = StyleSheet.create({
   mono: { color: colors.text, fontSize: 12, fontVariant: ['tabular-nums'] },
   status: { color: colors.textDim, fontSize: 13, marginTop: 2 },
   secondaryText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
-  hint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: spacing(1) },
 });
