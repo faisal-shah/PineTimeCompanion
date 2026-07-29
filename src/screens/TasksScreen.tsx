@@ -9,6 +9,7 @@ import { WatchTask } from '../model/types';
 import { needsSync as listNeedsSync, newItemId, syncedList, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { Hint } from '../ui/Hint';
+import { KeyboardStickyFooter } from '../ui/keyboard';
 import { useCapStyle } from '../ui/Screen';
 import { showAlert } from '../ui/alert';
 import { TextPrompt } from '../ui/Dialog';
@@ -132,6 +133,9 @@ export function TasksScreen({ route }: Props) {
         // footer once there are more rows than fit -- 20 tasks are allowed and
         // only about 8 were reachable.
         style={styles.list}
+        // Without this the first tap while the keyboard is up only dismisses it,
+        // so the button under your finger never fires.
+        keyboardShouldPersistTaps="handled"
         data={tasks}
         keyExtractor={(t) => String(t.id)}
         onDragEnd={({ data }) => reorder(data)}
@@ -159,7 +163,9 @@ export function TasksScreen({ route }: Props) {
       <Text style={styles.slots} testID="slots-used">{tasks.length} of {capacity} tasks</Text>
       <Hint center>Tap a task to rename it · press and hold to delete · drag the handle to reorder</Hint>
 
-      <View style={[styles.footer, cap, { paddingBottom: spacing(2) + insets.bottom }]}>
+      {/* Rides the IME so the compose row and Sync button stay reachable. */}
+      <KeyboardStickyFooter>
+        <View style={[styles.footer, cap, { paddingBottom: spacing(2) + insets.bottom }]}>
         <View style={styles.addRow}>
           <TextInput
             style={styles.addInput}
@@ -187,6 +193,7 @@ export function TasksScreen({ route }: Props) {
           )}
         </Pressable>
       </View>
+      </KeyboardStickyFooter>
 
       <TextPrompt
         visible={editing !== null}

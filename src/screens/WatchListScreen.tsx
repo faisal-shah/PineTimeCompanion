@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAwareScroll } from '../ui/keyboard';
 import { showAlert } from '../ui/alert';
 import { VersionFooter } from '../ui/VersionFooter';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -53,7 +54,7 @@ export function WatchListScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={[{ padding: spacing(2) }, capList]} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScroll contentContainerStyle={[{ padding: spacing(2) }, capList]}>
         {watches.length === 0 ? (
           <Text style={styles.empty}>
             No watches yet.{'\n'}Add one below to start building its schedule.
@@ -83,7 +84,7 @@ export function WatchListScreen({ navigation }: Props) {
             })}
           </CardGrid>
         )}
-      </ScrollView>
+      </KeyboardAwareScroll>
       <View style={[styles.addRow, capForm, { marginBottom: bottomLift }]}>
         <TextInput
           style={styles.input}

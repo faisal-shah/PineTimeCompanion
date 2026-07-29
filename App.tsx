@@ -1,6 +1,7 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from './src/ui/keyboard';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './src/navigation';
@@ -35,6 +36,10 @@ export default function App() {
   return (
     // GestureHandlerRootView must wrap everything for the draggable task list.
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Tracks the IME through WindowInsets. Required under Android
+          edge-to-edge, where the keyboard overlays content and React Native's
+          own Keyboard events never fire. No-op on web. */}
+      <KeyboardProvider>
       <WatchStoreContext.Provider value={store}>
         <NavigationContainer theme={navTheme}>
           <StatusBar style="light" />
@@ -58,6 +63,7 @@ export default function App() {
           </Stack.Navigator>
         </NavigationContainer>
       </WatchStoreContext.Provider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

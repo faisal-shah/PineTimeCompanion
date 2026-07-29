@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { KeyboardAwareScroll } from './keyboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from './theme';
 import { CONTENT_MAX_WIDTH, LIST_MAX_WIDTH, READ_MAX_WIDTH, useLayout } from './layout';
@@ -66,12 +67,11 @@ export function Screen({
   return (
     <View style={styles.root}>
       {scroll ? (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag">
+        // Keyboard-aware: under Android edge-to-edge the IME overlays content
+        // and a plain ScrollView leaves the focused field underneath it.
+        <KeyboardAwareScroll contentContainerStyle={styles.scrollContent} keyboardDismissMode="on-drag">
           <View style={capped}>{children}</View>
-        </ScrollView>
+        </KeyboardAwareScroll>
       ) : (
         <View style={styles.fill}>
           <View style={capped}>{children}</View>
