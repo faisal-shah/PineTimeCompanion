@@ -127,6 +127,11 @@ export function TasksScreen({ route }: Props) {
   return (
     <View style={styles.container}>
       <DraggableFlatList
+        // flex:1 so the list itself scrolls. Without it the list sizes to its
+        // content inside this flex column and simply gets squeezed by the
+        // footer once there are more rows than fit -- 20 tasks are allowed and
+        // only about 8 were reachable.
+        style={styles.list}
         data={tasks}
         keyExtractor={(t) => String(t.id)}
         onDragEnd={({ data }) => reorder(data)}
@@ -208,6 +213,7 @@ export function TasksScreen({ route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  list: { flex: 1 },
   busyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   empty: { color: colors.textDim, textAlign: 'center', marginTop: spacing(6), lineHeight: 22 },
   streakRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(2) },

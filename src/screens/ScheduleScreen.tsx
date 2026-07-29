@@ -91,6 +91,9 @@ export function ScheduleScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <FlatList
+        // flex:1 so the list scrolls; the schedule holds up to 64 events and
+        // without this it is clipped by the footer instead. Same fix as Tasks.
+        style={styles.list}
         data={[...watch.schedule.items].sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))}
         keyExtractor={(e) => String(e.id)}
         contentContainerStyle={[{ padding: spacing(2) }, cap]}
@@ -142,6 +145,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  list: { flex: 1 },
   busyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   empty: { color: colors.textDim, textAlign: 'center', marginTop: spacing(6), lineHeight: 22 },
   eventCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 12, padding: spacing(2), marginBottom: spacing(1) },
