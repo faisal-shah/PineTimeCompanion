@@ -132,7 +132,10 @@ export function TasksScreen({ route }: Props) {
         // content inside this flex column and simply gets squeezed by the
         // footer once there are more rows than fit -- 20 tasks are allowed and
         // only about 8 were reachable.
-        style={styles.list}
+        // containerStyle, NOT style: `style` goes to the inner list, so flex:1
+        // there collapses the whole thing to zero height. The OUTER container is
+        // what has to claim the leftover space for the list to scroll.
+        containerStyle={styles.list}
         // Without this the first tap while the keyboard is up only dismisses it,
         // so the button under your finger never fires.
         keyboardShouldPersistTaps="handled"

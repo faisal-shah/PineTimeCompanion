@@ -58,6 +58,7 @@
     "sim:proxy": "node scripts/ws-tcp-proxy.mjs",
     "web:export": "expo export --platform web --output-dir dist-web",
     "web:e2e": "node scripts/web-e2e.mjs",
+    "list:layout": "node scripts/list-layout-check.mjs",
     "desktop:dev": "npm --prefix desktop run dev",
     "desktop:build:linux": "expo export --platform web --output-dir desktop/dist && npm --prefix desktop install && npm --prefix desktop exec electron-builder -- --linux AppImage",
     "desktop:export": "expo export --platform web --output-dir desktop/dist",
