@@ -16,9 +16,13 @@ class MockDfuWatch implements WatchTransport {
   resetRaced = false;
   /** Make this control-point opcode fail, to exercise phase reporting. */
   failCtrlOp?: number;
+  /** Stop emitting packet receipts after this many payload packets, to model
+   *  the watch leaving the update screen mid-transfer. */
+  stopAckingAfter?: number;
   private notify?: (n: Uint8Array) => void;
   private bytesReceived = 0;
   private appSize = 0;
+  private payloadPackets = 0;
 
   constructor(private readonly crcOk: boolean) {}
 
@@ -79,7 +83,17 @@ class MockDfuWatch implements WatchTransport {
     // Everything after ReceiveImage is firmware payload — count it.
     if (this.appSize > 0 && this.bytesReceived < this.appSize && this.sawReceive) {
       this.bytesReceived += data.length;
-      if (this.bytesReceived >= this.appSize) this.send([0x10, 0x03, 0x01]);
+      this.payloadPackets++;
+      if (this.bytesReceived >= this.appSize) {
+        this.send([0x10, 0x03, 0x01]);
+      } else if (this.payloadPackets % 10 === 0) {
+        // Mirrors DfuService.cpp: a receipt every nbPacketsToNotify packets,
+        // carrying the watch's own byte count, and never on the packet that
+        // completes the image.
+        if (this.stopAckingAfter !== undefined && this.payloadPackets > this.stopAckingAfter) return;
+        const b = this.bytesReceived;
+        this.send([0x11, b & 0xff, (b >> 8) & 0xff, (b >> 16) & 0xff, (b >> 24) & 0xff]);
+      }
     }
   }
 
@@ -129,6 +143,35 @@ test('runDfu drives the full handshake and streams the image in 20-byte chunks',
   // Regression for the "Update failed: Characteristic 00001531-… write failed"
   // dialog that appeared on every *successful* update.
   assert.ok(watch.resetRaced, 'Activate+Reset must be written without a response');
+});
+
+test('runDfu fails, and stops advancing progress, when the watch stops acknowledging', async () => {
+  // Reported from hardware: the phone was switched to another app mid-update,
+  // the watch abandoned the transfer and returned to the watch face, and the
+  // companion's percentage kept climbing to the end. Packets go out with
+  // writeWithoutResponse, so they keep "succeeding" locally with nothing
+  // listening; only the watch's receipts prove otherwise.
+  const watch = new MockDfuWatch(true);
+  watch.stopAckingAfter = 10; // one receipt, then silence
+  const archive = makeArchive(4000); // 200 packets, so there is a lot left to fake
+  let highWater = 0;
+  await assert.rejects(
+    runDfu(watch, archive, (p) => {
+      if (p.phase === 'transfer') highWater = Math.max(highWater, p.sent);
+    }),
+    (e) => {
+      assert.ok(e instanceof DfuAbortedError, 'a silent watch is an aborted update, not a crash');
+      assert.match((e as Error).message, /stopped acknowledging/);
+      return true;
+    },
+  );
+  // The bar must reflect what the watch confirmed, which is the single receipt
+  // at 200 bytes -- not the ~4000 bytes we managed to hand to the BLE stack.
+  assert.equal(highWater, 200, 'progress may only count bytes the watch acknowledged');
+  assert.ok(
+    !watch.ctrlWrites.some((w) => w[0] === 0x05),
+    'a failed transfer must never activate the image',
+  );
 });
 
 test('runDfu names the step a transport failure came from', async () => {

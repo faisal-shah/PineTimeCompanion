@@ -30,6 +30,10 @@ const NOTIFY_TIMEOUT_MS = 8000;
 // it before it fires — so a failed validate sends NOTHING and we detect it by
 // this timeout instead. Kept comfortably above the 1s success latency.
 const VALIDATE_TIMEOUT_MS = 4000;
+// A PRN covers PRN_INTERVAL * CHUNK = 200 bytes, which the watch acknowledges in
+// well under a second. Generous, but bounded: this is what turns "the watch went
+// away" from a bar that fills to 100% into a reported failure.
+const PRN_TIMEOUT_MS = 8000;
 
 // Opcodes / responses (control point).
 const OP_START = 0x01;
@@ -38,6 +42,7 @@ const OP_RECEIVE_IMAGE = 0x03;
 const OP_VALIDATE = 0x04;
 const OP_ACTIVATE_RESET = 0x05;
 const OP_PRN_REQUEST = 0x08;
+const OP_PACKET_RECEIPT = 0x11;
 const RSP = 0x10;
 const IMAGE_TYPE_APP = 0x04;
 const ERR_NO_ERROR = 0x01;
@@ -125,13 +130,43 @@ export async function runDfu(
     await ctrl([OP_PRN_REQUEST, PRN_INTERVAL]);
     await ctrl([OP_RECEIVE_IMAGE]);
 
-    // 5. Stream the firmware in 20-byte chunks. PRN notifications ([0x11, …])
-    //    arrive every PRN_INTERVAL packets — informational, used for progress.
+    // 5. Stream the firmware in 20-byte chunks, waiting for the watch's
+    //    packet-receipt notification every PRN_INTERVAL packets.
+    //
+    //    The wait is not optional and the progress number comes from the watch,
+    //    not from us. Packets go out with writeWithoutResponse, which resolves
+    //    as soon as the local BLE stack accepts the bytes — so if the watch
+    //    aborts the update or the link dies, every write still "succeeds" and a
+    //    counter based on what we sent climbs happily to 100% while nothing is
+    //    arriving. The PRN is the only evidence the watch is still taking data.
+    //
+    //    The firmware sends a PRN every nbPacketsToNotify packets *except* when
+    //    that packet completes the image (DfuService.cpp: the `bytesReceived !=
+    //    applicationSize` guard) — there it sends the ReceiveImage response
+    //    instead, which is awaited below. So the final packet is never waited on
+    //    here, however the total divides.
+    let packetsSent = 0;
     for (let offset = 0; offset < total; offset += CHUNK) {
       await packet(binFile.subarray(offset, Math.min(offset + CHUNK, total)));
+      packetsSent++;
       const sent = Math.min(offset + CHUNK, total);
-      if ((sent / CHUNK) % PRN_INTERVAL === 0 || sent === total) {
-        report('transfer', sent);
+      if (packetsSent % PRN_INTERVAL === 0 && sent < total) {
+        let prn: Uint8Array;
+        try {
+          prn = await inbox.wait((n) => n[0] === OP_PACKET_RECEIPT, PRN_TIMEOUT_MS);
+        } catch (e) {
+          if (e instanceof TransportError) {
+            throw new DfuAbortedError(
+              'The watch stopped acknowledging firmware packets, so the update was abandoned. ' +
+                'It usually means the watch left the update screen or the connection dropped. ' +
+                'The watch keeps running its current firmware — start the update again.',
+            );
+          }
+          throw e;
+        }
+        // The watch's own byte count, so the bar can only advance on bytes that
+        // actually landed.
+        report('transfer', new DataView(prn.buffer, prn.byteOffset).getUint32(1, true));
       }
     }
     // Firmware sends [0x10,0x03,0x01] once every byte is received.

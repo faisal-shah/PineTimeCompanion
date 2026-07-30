@@ -248,6 +248,10 @@ export function UpdateScreen({ route }: Props) {
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${Math.max(2, Math.min(100, progress.pct))}%` }]} />
             </View>
+            {/* Android throttles BLE for backgrounded apps, and the watch aborts
+                the transfer after 10 s of inactivity. Leaving the app is the
+                most likely way an update dies, so say so while it is running. */}
+            <Hint>Keep this screen open until it finishes. Switching apps can interrupt the transfer.</Hint>
           </View>
         )}
 
