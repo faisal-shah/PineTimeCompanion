@@ -23,6 +23,7 @@ import android.util.Log
 class SystemMediaSource(private val context: Context) : MediaSource {
   private companion object {
     const val TAG = "NotifyFwd/Media"
+    const val REPICK_WINDOW_MS = 300L
   }
 
   private val thread = HandlerThread("NotifyFwdMedia").apply { start() }
@@ -38,8 +39,26 @@ class SystemMediaSource(private val context: Context) : MediaSource {
 
   private val repickCallback = object : MediaController.Callback() {
     override fun onPlaybackStateChanged(state: PlaybackState?) {
-      repick()
+      requestRepick()
     }
+  }
+
+  // onPlaybackStateChanged fires continuously while anything is playing — a
+  // video player re-publishes state as its position advances. repick() calls
+  // MediaSessionManager.getActiveSessions, which is a binder round trip into
+  // system_server that builds a controller per session, so running it per
+  // callback puts sustained load on the whole device rather than just this app.
+  // Coalesce to one repick per window; a re-pick that lands 300 ms late is
+  // invisible, since it only decides which session we follow.
+  private var repickPending = false
+
+  private fun requestRepick() {
+    if (repickPending) return
+    repickPending = true
+    handler.postDelayed({
+      repickPending = false
+      repick()
+    }, REPICK_WINDOW_MS)
   }
 
   private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { sessions ->

@@ -21,17 +21,34 @@ object ForwarderConfigStore {
   private const val PREFS = "notification_forwarder"
   private const val KEY = "config/v1"
 
+  // Parsed form of the last raw string seen. load() is called from notification
+  // and service callbacks, so re-parsing the JSON every time is pure waste; the
+  // raw string is the cache key, which keeps this correct even if another
+  // process writes the prefs.
+  @Volatile
+  private var cachedRaw: String? = null
+
+  @Volatile
+  private var cachedConfig: ForwarderConfig? = null
+
   fun load(context: Context): ForwarderConfig {
     val raw = prefs(context).getString(KEY, null) ?: return ForwarderConfig()
-    return try {
+    cachedConfig?.let { if (raw == cachedRaw) return it }
+    val parsed = try {
       parse(JSONObject(raw))
     } catch (_: Exception) {
       ForwarderConfig()
     }
+    cachedRaw = raw
+    cachedConfig = parsed
+    return parsed
   }
 
   fun save(context: Context, config: ForwarderConfig) {
-    prefs(context).edit().putString(KEY, serialize(config).toString()).apply()
+    val raw = serialize(config).toString()
+    prefs(context).edit().putString(KEY, raw).apply()
+    cachedRaw = raw
+    cachedConfig = config
   }
 
   fun serialize(config: ForwarderConfig): JSONObject {

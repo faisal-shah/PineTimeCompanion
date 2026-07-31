@@ -41,13 +41,29 @@ class NotifListenerService : NotificationListenerService() {
   }
 
   override fun onNotificationPosted(sbn: StatusBarNotification) {
+    val n = sbn.notification
+    // Cheap rejects BEFORE any side effect. Reading config or touching the
+    // service above this line makes our own foreground notification re-enter
+    // this callback and drive a self-sustaining loop; see cheapDropReason.
+    // extract() is below it too, because it can hit PackageManager for a label.
+    if (filter.cheapDropReason(
+        sbn.packageName,
+        n.category == Notification.CATEGORY_CALL,
+        (n.flags and Notification.FLAG_ONGOING_EVENT) != 0,
+        (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0,
+      ) != null
+    ) {
+      return
+    }
+
     val config = ForwarderConfigStore.load(this)
     if (config.enabledWatches.isEmpty()) return
 
     ConnectionManager.init(applicationContext)
-    // Defensively make sure the link-holding service is up.
+    // Only if it isn't already up: startForegroundService is a round trip
+    // through ActivityManager, not a cheap idempotent poke.
     try {
-      ForwarderService.refresh(applicationContext)
+      ForwarderService.refreshIfStopped(applicationContext)
     } catch (e: Exception) {
       Log.w(TAG, "could not refresh service: ${e.message}")
     }

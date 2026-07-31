@@ -24,7 +24,15 @@ class ForwarderService : Service() {
 
   override fun onCreate() {
     super.onCreate()
+    running = true
     ConnectionManager.init(applicationContext)
+  }
+
+  override fun onDestroy() {
+    // Without this, refreshIfStopped would refuse to restart the service for the
+    // rest of the process's life.
+    running = false
+    super.onDestroy()
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -79,10 +87,26 @@ class ForwarderService : Service() {
     private const val CHANNEL_ID = "watch_link"
     private const val NOTIF_ID = 4711
 
+    /** Set while the service is up, so callers on hot paths can skip the
+     *  ActivityManager round trip that starting it costs. */
+    @Volatile
+    private var running = false
+
     /** Start (or refresh) the service if any watch is enabled. Safe from a
      *  foreground context or the listener/boot receiver. */
     fun refresh(context: Context) {
       ContextCompat.startForegroundService(context, Intent(context, ForwarderService::class.java))
+    }
+
+    /**
+     * Start the service only if it is not already up. For callers that fire per
+     * notification: startForegroundService is a binder round trip into
+     * ActivityManager and re-posts this service's own notification, so calling
+     * it unconditionally on a hot path is both expensive and self-feeding.
+     */
+    fun refreshIfStopped(context: Context) {
+      if (running) return
+      refresh(context)
     }
   }
 }

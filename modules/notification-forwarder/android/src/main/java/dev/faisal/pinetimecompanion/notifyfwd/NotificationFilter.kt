@@ -36,10 +36,34 @@ class NotificationFilter(
   private var tokens = burst.toDouble()
   private var lastRefill = Long.MIN_VALUE
 
+  /**
+   * The rejects that need no configuration, no allocation and no I/O. These MUST
+   * be checked before anything with a side effect.
+   *
+   * Our own foreground-service notification is one of them, and it is not a
+   * rare case: posting it re-enters this listener. Doing work before this point
+   * — reading config, calling startForegroundService — makes that a loop that
+   * sustains itself (service start -> notification posted -> listener ->
+   * service start), burning CPU in the app and in system_server for as long as
+   * forwarding is enabled.
+   *
+   * Ongoing notifications land here too, which matters just as much: a media
+   * app re-posts its ongoing notification continuously while playing, so every
+   * second of video would otherwise mean repeated config parses and
+   * ActivityManager round trips.
+   *
+   * Returns the drop reason, or null if the notification deserves a real look.
+   */
+  fun cheapDropReason(packageName: String, isCall: Boolean, isOngoing: Boolean, isGroupSummary: Boolean): String? =
+    when {
+      packageName == ownPackage -> "own"
+      isGroupSummary -> "summary"
+      isOngoing && !isCall -> "ongoing"
+      else -> null
+    }
+
   fun decide(n: Incoming, allowedPackages: Set<String>, forwardCalls: Boolean, nowMs: Long): Decision {
-    if (n.packageName == ownPackage) return Decision.Drop("own")
-    if (n.isGroupSummary) return Decision.Drop("summary")
-    if (n.isOngoing && !n.isCall) return Decision.Drop("ongoing")
+    cheapDropReason(n.packageName, n.isCall, n.isOngoing, n.isGroupSummary)?.let { return Decision.Drop(it) }
     if (n.isCall) {
       if (!forwardCalls) return Decision.Drop("calls-off")
     } else if (n.packageName !in allowedPackages) {

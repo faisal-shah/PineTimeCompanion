@@ -33,6 +33,56 @@ class MusicBridgeTest {
     return Triple(bridge, source, rec)
   }
 
+  /** Harness that also records what would cross the JS bridge. */
+  private fun harnessWithNowPlaying(
+    clockMs: () -> Long = { 0L },
+  ): Triple<FakeSource, Recorder, MutableList<Triple<String, String, Boolean>?>> {
+    val source = FakeSource()
+    val rec = Recorder()
+    val emitted = mutableListOf<Triple<String, String, Boolean>?>()
+    MusicBridge(rec::writer, source, clockMs, onNowPlayingChanged = { emitted += it }).start()
+    return Triple(source, rec, emitted)
+  }
+
+  @Test
+  fun `repeated playback updates emit one now-playing event, not one per callback`() {
+    // onPlaybackStateChanged fires as the position advances, so a playing video
+    // drives this continuously. The payload is (artist, track, playing), which
+    // does not change with position -- emitting each time wakes the JS thread
+    // for an identical value.
+    val (source, _, emitted) = harnessWithNowPlaying()
+    source.listener!!.onTrack("Queen", "Bohemian Rhapsody", "A Night at the Opera", 354)
+    // The first update legitimately flips playing false -> true, so it emits.
+    source.listener!!.onPlayback(playing = true, positionSeconds = 0, speedX100 = 100)
+    val settled = emitted.size
+    for (position in 1..50L) {
+      source.listener!!.onPlayback(playing = true, positionSeconds = position, speedX100 = 100)
+    }
+    assertEquals("50 further position updates must emit nothing", settled, emitted.size)
+
+    // A genuine change still gets through.
+    source.listener!!.onPlayback(playing = false, positionSeconds = 51, speedX100 = 100)
+    assertEquals(settled + 1, emitted.size)
+    assertEquals(false, emitted.last()!!.third)
+  }
+
+  @Test
+  fun `position updates still reach the watch so a seek is not missed`() {
+    // The dedupe above must not starve MusicBridge's drift check: it needs the
+    // position stream to notice a seek and re-anchor the watch.
+    var now = 0L
+    val (source, rec, _) = harnessWithNowPlaying(clockMs = { now })
+    source.listener!!.onTrack("Queen", "Bohemian Rhapsody", "A Night at the Opera", 354)
+    source.listener!!.onPlayback(playing = true, positionSeconds = 0, speedX100 = 100)
+    rec.clear()
+    now = 1_000
+    source.listener!!.onPlayback(playing = true, positionSeconds = 120, speedX100 = 100) // a seek
+    assertTrue(
+      "a seek must rewrite the position characteristic",
+      rec.of(WatchChar.MUSIC_POSITION).isNotEmpty(),
+    )
+  }
+
   @Test
   fun `track metadata writes all changed chars`() {
     val (_, source, rec) = harness()

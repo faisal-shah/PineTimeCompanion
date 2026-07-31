@@ -83,4 +83,50 @@ class NotificationFilterTest {
     assertEquals(3, results.count { it is Decision.ForwardNotification })
     assertEquals(2, results.count { it is Decision.Drop && it.reason == "rate" })
   }
+
+  // --- the cheap pre-filter, which runs before any side effect ---
+
+  @Test
+  fun `our own foreground-service notification is rejected by the cheap filter`() {
+    // The loop this guards: posting the service notification re-enters the
+    // listener, which restarts the service, which re-posts the notification.
+    // The reject has to be reachable without reading config or touching the
+    // service, which is what cheapDropReason is for.
+    val f = NotificationFilter(own)
+    assertEquals("own", f.cheapDropReason(own, isCall = false, isOngoing = false, isGroupSummary = false))
+    assertEquals("own", f.cheapDropReason(own, isCall = false, isOngoing = true, isGroupSummary = false))
+  }
+
+  @Test
+  fun `ongoing media notifications are rejected by the cheap filter`() {
+    // A media app re-posts its ongoing notification continuously while playing.
+    val f = NotificationFilter(own)
+    assertEquals("ongoing", f.cheapDropReason("com.spotify.music", isCall = false, isOngoing = true, isGroupSummary = false))
+    assertEquals("summary", f.cheapDropReason("com.whatsapp", isCall = false, isOngoing = false, isGroupSummary = true))
+  }
+
+  @Test
+  fun `an ongoing call still passes the cheap filter`() {
+    // Ringing calls are ongoing but must survive to the real decision.
+    val f = NotificationFilter(own)
+    assertEquals(null, f.cheapDropReason("com.android.dialer", isCall = true, isOngoing = true, isGroupSummary = false))
+  }
+
+  @Test
+  fun `cheap filter agrees with decide on every reason it claims`() {
+    // One source of truth: decide delegates to cheapDropReason, so a drift
+    // between them would silently reintroduce the loop.
+    val f = NotificationFilter(own)
+    val cases = listOf(
+      Triple(own, false, false),
+      Triple("com.whatsapp", false, true),
+      Triple("com.spotify.music", false, false),
+    )
+    for ((pkg, isCall, isSummary) in cases) {
+      val ongoing = pkg == "com.spotify.music"
+      val cheap = f.cheapDropReason(pkg, isCall, ongoing, isSummary)
+      val d = f.decide(notif(pkg = pkg, isCall = isCall, isOngoing = ongoing, isGroupSummary = isSummary), allowed, true, 0L)
+      assertTrue("cheap=$cheap decide=$d", cheap == null || (d is Decision.Drop && d.reason == cheap))
+    }
+  }
 }

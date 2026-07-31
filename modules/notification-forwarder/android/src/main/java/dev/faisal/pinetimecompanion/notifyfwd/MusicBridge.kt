@@ -53,6 +53,18 @@ class MusicBridge(
 
   // --- MediaSource.Listener (phone -> watch) ---
 
+  // Last triple handed to the JS bridge. onPlayback fires as the position
+  // advances, but the triple only carries artist/track/playing, so emitting it
+  // every time wakes the JS thread for an identical payload.
+  private var lastNowPlaying: Triple<String, String, Boolean>? = null
+
+  private fun emitNowPlayingIfChanged() {
+    val np = nowPlaying()
+    if (np == lastNowPlaying) return
+    lastNowPlaying = np
+    onNowPlayingChanged(np)
+  }
+
   override fun onTrack(artist: String, track: String, album: String, durationSeconds: Long) {
     synchronized(lock) {
       hasSession = true
@@ -62,7 +74,7 @@ class MusicBridge(
       this.durationS = durationSeconds
       flushLocked()
     }
-    onNowPlayingChanged(nowPlaying())
+    emitNowPlayingIfChanged()
   }
 
   override fun onPlayback(playing: Boolean, positionSeconds: Long, speedX100: Long) {
@@ -73,7 +85,7 @@ class MusicBridge(
       this.speedX100 = speedX100
       flushLocked()
     }
-    onNowPlayingChanged(nowPlaying())
+    emitNowPlayingIfChanged()
   }
 
   override fun onSessionGone() {
@@ -86,6 +98,7 @@ class MusicBridge(
       // Tell the watch playback stopped; keep the last track text on-screen.
       writeIfChangedLocked(WatchChar.MUSIC_STATUS, MusicCodec.encodeBool(false))
     }
+    lastNowPlaying = null
     onNowPlayingChanged(null)
   }
 
