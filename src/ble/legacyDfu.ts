@@ -34,6 +34,11 @@ const VALIDATE_TIMEOUT_MS = 4000;
 // well under a second. Generous, but bounded: this is what turns "the watch went
 // away" from a bar that fills to 100% into a reported failure.
 const PRN_TIMEOUT_MS = 8000;
+// How far the phone may run ahead of the watch's acknowledged byte count before
+// it stops and insists on hearing from it. Big enough that a healthy transfer
+// never blocks (receipts arrive every PRN_INTERVAL packets, far inside this),
+// small enough that a watch which has gone away is caught within a kilobyte.
+const WINDOW_BYTES = 50 * CHUNK;
 
 // Opcodes / responses (control point).
 const OP_START = 0x01;
@@ -146,27 +151,50 @@ export async function runDfu(
     //    instead, which is awaited below. So the final packet is never waited on
     //    here, however the total divides.
     let packetsSent = 0;
+    let ackedBytes = 0;
+    const isReceipt = (n: Uint8Array) => n[0] === OP_PACKET_RECEIPT;
+    const stalled = () =>
+      new DfuAbortedError(
+        'The watch stopped acknowledging firmware packets, so the update was abandoned. ' +
+          'It usually means the watch left the update screen or the connection dropped. ' +
+          'The watch keeps running its current firmware — start the update again.',
+      );
+
+    // Consume whatever receipts have already arrived, without waiting for one.
+    const drainReceipts = () => {
+      for (;;) {
+        const prn = inbox.tryTake(isReceipt);
+        if (prn === undefined) {
+          return;
+        }
+        ackedBytes = new DataView(prn.buffer, prn.byteOffset).getUint32(1, true);
+        report('transfer', ackedBytes);
+      }
+    };
+
     for (let offset = 0; offset < total; offset += CHUNK) {
       await packet(binFile.subarray(offset, Math.min(offset + CHUNK, total)));
       packetsSent++;
       const sent = Math.min(offset + CHUNK, total);
-      if (packetsSent % PRN_INTERVAL === 0 && sent < total) {
-        let prn: Uint8Array;
+      drainReceipts();
+
+      // Only stop if we have run far enough ahead of the watch to doubt it is
+      // still there. Blocking on every receipt instead costs a round trip per
+      // PRN_INTERVAL packets, which on a 400 KB image is ~2000 of them and adds
+      // minutes to a flash; packets are written without response precisely so
+      // several fit in one connection interval.
+      if (sent < total && packetsSent * CHUNK - ackedBytes >= WINDOW_BYTES) {
         try {
-          prn = await inbox.wait((n) => n[0] === OP_PACKET_RECEIPT, PRN_TIMEOUT_MS);
+          const prn = await inbox.wait(isReceipt, PRN_TIMEOUT_MS);
+          ackedBytes = new DataView(prn.buffer, prn.byteOffset).getUint32(1, true);
+          report('transfer', ackedBytes);
         } catch (e) {
           if (e instanceof TransportError) {
-            throw new DfuAbortedError(
-              'The watch stopped acknowledging firmware packets, so the update was abandoned. ' +
-                'It usually means the watch left the update screen or the connection dropped. ' +
-                'The watch keeps running its current firmware — start the update again.',
-            );
+            throw stalled();
           }
           throw e;
         }
-        // The watch's own byte count, so the bar can only advance on bytes that
-        // actually landed.
-        report('transfer', new DataView(prn.buffer, prn.byteOffset).getUint32(1, true));
+        drainReceipts();
       }
     }
     // Firmware sends [0x10,0x03,0x01] once every byte is received.

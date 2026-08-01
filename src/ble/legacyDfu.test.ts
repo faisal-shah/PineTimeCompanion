@@ -19,6 +19,8 @@ class MockDfuWatch implements WatchTransport {
   /** Stop emitting packet receipts after this many payload packets, to model
    *  the watch leaving the update screen mid-transfer. */
   stopAckingAfter?: number;
+  /** Pretend a packet receipt takes this long to come back, as a real link would. */
+  receiptDelayMs = 0;
   private notify?: (n: Uint8Array) => void;
   private bytesReceived = 0;
   private appSize = 0;
@@ -87,12 +89,19 @@ class MockDfuWatch implements WatchTransport {
       if (this.bytesReceived >= this.appSize) {
         this.send([0x10, 0x03, 0x01]);
       } else if (this.payloadPackets % 10 === 0) {
+        if (this.stopAckingAfter !== undefined && this.payloadPackets > this.stopAckingAfter) return;
+        const b0 = this.bytesReceived;
+        if (this.receiptDelayMs > 0) {
+          setTimeout(
+            () => this.notify?.(new Uint8Array([0x11, b0 & 0xff, (b0 >> 8) & 0xff, (b0 >> 16) & 0xff, (b0 >> 24) & 0xff])),
+            this.receiptDelayMs,
+          );
+          return;
+        }
         // Mirrors DfuService.cpp: a receipt every nbPacketsToNotify packets,
         // carrying the watch's own byte count, and never on the packet that
         // completes the image.
-        if (this.stopAckingAfter !== undefined && this.payloadPackets > this.stopAckingAfter) return;
-        const b = this.bytesReceived;
-        this.send([0x11, b & 0xff, (b >> 8) & 0xff, (b >> 16) & 0xff, (b >> 24) & 0xff]);
+        this.send([0x11, b0 & 0xff, (b0 >> 8) & 0xff, (b0 >> 16) & 0xff, (b0 >> 24) & 0xff]);
       }
     }
   }
@@ -143,6 +152,22 @@ test('runDfu drives the full handshake and streams the image in 20-byte chunks',
   // Regression for the "Update failed: Characteristic 00001531-… write failed"
   // dialog that appeared on every *successful* update.
   assert.ok(watch.resetRaced, 'Activate+Reset must be written without a response');
+});
+
+test('a healthy transfer does not stop and wait for each receipt', async () => {
+  // Regression for a real slowdown: blocking on every packet-receipt cost a
+  // round trip per PRN_INTERVAL packets, which on a 400 KB image is ~2000 of
+  // them and added minutes to a flash. Packets are written without response so
+  // several ride in one connection interval; the transfer must keep streaming
+  // and consume receipts as they arrive.
+  const watch = new MockDfuWatch(true);
+  watch.receiptDelayMs = 25; // a round trip is not free
+  const archive = makeArchive(8000); // 400 packets -> 40 receipts
+  const started = Date.now();
+  await runDfu(watch, archive);
+  const elapsed = Date.now() - started;
+  // Serializing would cost at least 40 * 25 = 1000 ms of pure waiting.
+  assert.ok(elapsed < 500, `transfer took ${elapsed}ms, so it is still serializing on receipts`);
 });
 
 test('runDfu fails, and stops advancing progress, when the watch stops acknowledging', async () => {

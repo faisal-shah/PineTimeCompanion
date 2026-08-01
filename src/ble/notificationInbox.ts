@@ -21,6 +21,16 @@ export class NotificationInbox {
     this.queue.push(n);
   }
 
+  /**
+   * Take an already-queued notification, or undefined if none matches. For
+   * callers that must not block: the DFU transfer drains receipts this way so
+   * it can keep streaming packets instead of stopping for each one.
+   */
+  tryTake(match: (n: Uint8Array) => boolean): Uint8Array | undefined {
+    const idx = this.queue.findIndex(match);
+    return idx >= 0 ? this.queue.splice(idx, 1)[0] : undefined;
+  }
+
   wait(match: (n: Uint8Array) => boolean, timeoutMs = this.defaultTimeoutMs): Promise<Uint8Array> {
     const idx = this.queue.findIndex(match);
     if (idx >= 0) {
