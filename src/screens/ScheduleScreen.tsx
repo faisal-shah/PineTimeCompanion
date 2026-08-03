@@ -12,6 +12,7 @@ import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
 import { useWatchOp } from '../ui/useWatchOp';
 import { describeRule } from '../model/types';
+import { isSpentOneOff } from '../model/recurrence';
 import { makeTransport } from '../ble/transportFactory';
 import { ListResetError, syncSchedule } from '../ble/listSyncManager';
 import { pushWeather } from '../weather/pushWeather';
@@ -19,6 +20,12 @@ import { pushWeather } from '../weather/pushWeather';
 type Props = NativeStackScreenProps<RootStackParamList, 'Schedule'>;
 
 export function ScheduleScreen({ navigation, route }: Props) {
+  // One clock for the whole render, refreshed when the screen regains focus, so
+  // every row agrees on what has already passed. A one-off tipping over while
+  // you stare at the list is not worth a timer.
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => navigation.addListener('focus', () => setNow(new Date())), [navigation]);
+
   const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const op = useWatchOp(watch);
@@ -93,6 +100,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
       <FlatList
         // flex:1 so the list scrolls; the schedule holds up to 64 events and
         // without this it is clipped by the footer instead. Same fix as Tasks.
+        extraData={now}
         style={styles.list}
         data={[...watch.schedule.items].sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))}
         keyExtractor={(e) => String(e.id)}
@@ -104,11 +112,21 @@ export function ScheduleScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate('EventEdit', { watchId: watch.id, eventId: item.id })}
             onLongPress={() => deleteEvent(item.id)}
             testID={`event-${item.title}`}>
-            <Text style={styles.eventTime}>{formatTime(item.hour, item.minute)}</Text>
+            <Text style={[styles.eventTime, isSpentOneOff(item, now) && styles.spentTime]}>
+              {formatTime(item.hour, item.minute)}
+            </Text>
             <View style={{ flex: 1, marginLeft: spacing(2) }}>
               <Text style={[styles.eventTitle, !item.enabled && styles.disabled]}>{item.title}</Text>
               <Text style={styles.eventRule}>{describeRule(item.rule)}</Text>
             </View>
+            {/* A one-off that has been and gone will never fire again; it is
+                just holding one of the 64 slots. Say so, so it is obvious what
+                is safe to long-press away. */}
+            {isSpentOneOff(item, now) && (
+              <View style={styles.spentBadge} testID={`spent-${item.title}`}>
+                <Text style={styles.spentBadgeText}>PASSED</Text>
+              </View>
+            )}
           </Pressable>
         )}
       />
@@ -152,6 +170,9 @@ const styles = StyleSheet.create({
   eventTime: { color: colors.accent, fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
   eventTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
   disabled: { color: colors.textDim, textDecorationLine: 'line-through' },
+  spentTime: { color: colors.textDim },
+  spentBadge: { backgroundColor: colors.warn, borderRadius: 6, paddingHorizontal: spacing(0.75), paddingVertical: 2, marginLeft: spacing(1) },
+  spentBadgeText: { color: colors.background, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   eventRule: { color: colors.textDim, fontSize: 13, marginTop: 2 },
   slots: { color: colors.textDim, fontSize: 13, textAlign: 'center', paddingVertical: spacing(0.5) },
   bottomRow: { flexDirection: 'row', padding: spacing(2), paddingTop: spacing(1), gap: spacing(1) },

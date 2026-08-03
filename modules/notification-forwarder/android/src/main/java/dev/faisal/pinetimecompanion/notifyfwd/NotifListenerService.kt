@@ -75,8 +75,11 @@ class NotifListenerService : NotificationListenerService() {
     when (d) {
       is NotificationFilter.Decision.ForwardNotification ->
         ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeNotification(d.title, d.body))
-      is NotificationFilter.Decision.ForwardCall ->
+      is NotificationFilter.Decision.ForwardCall -> {
+        // Keep the dialer's own decline action so the watch can press it.
+        RingingCall.remember(sbn)
         ConnectionManager.broadcast(WatchChar.NEW_ALERT, AnsCodec.encodeIncomingCall(d.caller))
+      }
       is NotificationFilter.Decision.Drop -> {}
     }
   }
@@ -92,12 +95,20 @@ class NotifListenerService : NotificationListenerService() {
    */
   private fun isIncomingCall(n: Notification): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      val callType = n.extras.getInt(Notification.EXTRA_CALL_TYPE, -1)
-      if (callType != -1) {
+      val callType = n.extras.getInt(Notification.EXTRA_CALL_TYPE, Notification.CallStyle.CALL_TYPE_UNKNOWN)
+      // UNKNOWN means the dialer used CallStyle but did not say which direction,
+      // so it is no more informative than the extra being absent. Treating it as
+      // "not incoming" would silently drop that dialer's real incoming calls.
+      if (callType != Notification.CallStyle.CALL_TYPE_UNKNOWN) {
         return callType == Notification.CallStyle.CALL_TYPE_INCOMING
       }
     }
     return n.fullScreenIntent != null
+  }
+
+  override fun onNotificationRemoved(sbn: StatusBarNotification) {
+    // The call ended, was answered on the phone, or was declined elsewhere.
+    RingingCall.forget(sbn)
   }
 
   private fun extract(sbn: StatusBarNotification): NotificationFilter.Incoming {

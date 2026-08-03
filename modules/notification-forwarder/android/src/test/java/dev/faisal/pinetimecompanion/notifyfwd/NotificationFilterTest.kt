@@ -176,4 +176,19 @@ class NotificationFilterTest {
     val f = NotificationFilter(own)
     assertEquals(null, f.cheapDropReason("com.some.dialer", isCall = true, isOngoing = true, isGroupSummary = false))
   }
+
+  @Test
+  fun `a call whose direction the dialer left unknown is still forwarded`() {
+    // CALL_TYPE_UNKNOWN is 0, and the extra defaults to it. Treating that as
+    // "not incoming" would silently drop real incoming calls from any dialer
+    // that sets CallStyle without stating a direction.
+    val f = NotificationFilter(own)
+    val d = f.decide(
+      notif(pkg = "com.some.dialer", title = "Alice", isCall = true, isOngoing = true, isIncomingCall = true),
+      allowed,
+      forwardCalls = true,
+      nowMs = 0L,
+    )
+    assertTrue("an unknown-direction call must not be dropped: $d", d is Decision.ForwardCall)
+  }
 }

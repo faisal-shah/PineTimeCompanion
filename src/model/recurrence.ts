@@ -95,3 +95,16 @@ export function upcoming(event: WatchEvent, from: Date, max: number): Date[] {
   }
   return out;
 }
+
+/**
+ * A one-off whose moment has been and gone. It will never fire again, so it is
+ * only taking up one of the watch's 64 slots.
+ *
+ * Deliberately narrower than "nextOccurrence() is undefined": that is also true
+ * of a disabled event and of a weekly rule with no days ticked, and neither of
+ * those is spent — you turned one off and the other is misconfigured. Only a
+ * one-shot is genuinely used up.
+ */
+export function isSpentOneOff(event: WatchEvent, now: Date): boolean {
+  return event.rule.kind === 'once' && anchorDateTime(event) < now;
+}

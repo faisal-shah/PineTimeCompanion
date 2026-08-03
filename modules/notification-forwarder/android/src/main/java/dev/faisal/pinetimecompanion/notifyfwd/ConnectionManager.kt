@@ -29,6 +29,9 @@ object ConnectionManager {
   /** Optional sinks so the module can emit JS events when the runtime is alive. */
   @Volatile var onConnectionState: ((String, ConnState) -> Unit)? = null
   @Volatile var onCallEvent: ((String, Int) -> Unit)? = null
+
+  // InfiniTime's AlertNotificationService::IncomingCallResponses.
+  private const val CALL_EVENT_REJECT = 0x00
   @Volatile var onNowPlaying: ((Triple<String, String, Boolean>?) -> Unit)? = null
 
   // Music bridging rides the same enabled-watch set: created when any watch is
@@ -115,6 +118,11 @@ object ConnectionManager {
     }
     val dispatchCall: (String, Int) -> Unit = { id, e ->
       Log.i(TAG, "call event from $id: $e")
+      // Reject is acted on here rather than in JS: the app may not be running,
+      // and a call has to be declined while it is still ringing.
+      if (e == CALL_EVENT_REJECT && !RingingCall.reject()) {
+        Log.i(TAG, "watch asked to reject a call, but no decline action was available")
+      }
       onCallEvent?.invoke(id, e)
     }
     val dispatchMusic: (String, Int) -> Unit = { id, e ->
