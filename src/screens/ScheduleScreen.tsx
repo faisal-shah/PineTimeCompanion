@@ -12,7 +12,7 @@ import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
 import { useWatchOp } from '../ui/useWatchOp';
 import { describeRule } from '../model/types';
-import { isSpentOneOff } from '../model/recurrence';
+import { isSpent } from '../model/recurrence';
 import { makeTransport } from '../ble/transportFactory';
 import { ListResetError, syncSchedule } from '../ble/listSyncManager';
 import { pushWeather } from '../weather/pushWeather';
@@ -112,7 +112,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate('EventEdit', { watchId: watch.id, eventId: item.id })}
             onLongPress={() => deleteEvent(item.id)}
             testID={`event-${item.title}`}>
-            <Text style={[styles.eventTime, isSpentOneOff(item, now) && styles.spentTime]}>
+            <Text style={[styles.eventTime, isSpent(item, now) && styles.spentTime]}>
               {formatTime(item.hour, item.minute)}
             </Text>
             <View style={{ flex: 1, marginLeft: spacing(2) }}>
@@ -122,7 +122,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
             {/* A one-off that has been and gone will never fire again; it is
                 just holding one of the 64 slots. Say so, so it is obvious what
                 is safe to long-press away. */}
-            {isSpentOneOff(item, now) && (
+            {isSpent(item, now) && (
               <View style={styles.spentBadge} testID={`spent-${item.title}`}>
                 <Text style={styles.spentBadgeText}>PASSED</Text>
               </View>

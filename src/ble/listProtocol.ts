@@ -47,11 +47,19 @@ export function encodeBeginSync(count: number, version: number): Uint8Array {
   return new Uint8Array([0x00, 0x00, count, ...u32le(version)]);
 }
 
-/** Wrap a per-item record as a RecordMessage: [type=1][recordVersion=1][index][record]. */
-export function encodeRecordMessage(index: number, record: Uint8Array): Uint8Array {
+/**
+ * Wrap a per-item record as a RecordMessage: [type=1][recordVersion][index][record].
+ *
+ * The version byte is per-feature, not global: the watch checks it before
+ * copying the bytes into its struct, and the schedule and task records version
+ * independently. Defaulting it hid a real bug once -- the schedule record grew
+ * and this still announced v1, so a correctly-updated watch rejected every
+ * record the app sent.
+ */
+export function encodeRecordMessage(index: number, record: Uint8Array, recordVersion: number): Uint8Array {
   const msg = new Uint8Array(3 + record.length);
   msg[0] = 0x01;
-  msg[1] = 0x01;
+  msg[1] = recordVersion;
   msg[2] = index;
   msg.set(record, 3);
   return msg;

@@ -25,7 +25,34 @@ function addDays(d: Date, days: number): Date {
 const lastDayOfMonth = (year: number, month0: number) => new Date(year, month0 + 1, 0).getDate();
 
 /** First occurrence at or after `from`, or undefined. */
+/** Midnight ending the event's last day, so the end date itself still fires. */
+function endBoundary(event: WatchEvent): Date | undefined {
+  if (event.endDate === undefined) {
+    return undefined;
+  }
+  const [y, m, d] = event.endDate.split('-').map(Number);
+  return new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+}
+
+/** The rule is over: it has an end date and that date is behind us. */
+export function hasExpired(event: WatchEvent, now: Date): boolean {
+  const end = endBoundary(event);
+  return end !== undefined && now >= end;
+}
+
 export function nextOccurrence(event: WatchEvent, from: Date): Date | undefined {
+  // Applied here rather than in each rule branch, mirroring the firmware: every
+  // branch has its own early returns and an end only some of them honoured
+  // would be a rule that quietly keeps firing.
+  const next = nextOccurrenceUnbounded(event, from);
+  if (next === undefined) {
+    return undefined;
+  }
+  const end = endBoundary(event);
+  return end !== undefined && next >= end ? undefined : next;
+}
+
+function nextOccurrenceUnbounded(event: WatchEvent, from: Date): Date | undefined {
   if (!event.enabled) {
     return undefined;
   }
@@ -97,14 +124,14 @@ export function upcoming(event: WatchEvent, from: Date, max: number): Date[] {
 }
 
 /**
- * A one-off whose moment has been and gone. It will never fire again, so it is
- * only taking up one of the watch's 64 slots.
+ * The event will never fire again: a one-off whose moment has passed, or a
+ * recurring rule past its end date. Either way it is only taking up one of the
+ * watch's 64 slots, and the watch itself will no longer show it.
  *
  * Deliberately narrower than "nextOccurrence() is undefined": that is also true
  * of a disabled event and of a weekly rule with no days ticked, and neither of
- * those is spent — you turned one off and the other is misconfigured. Only a
- * one-shot is genuinely used up.
+ * those is spent — you turned one off and the other is misconfigured.
  */
-export function isSpentOneOff(event: WatchEvent, now: Date): boolean {
-  return event.rule.kind === 'once' && anchorDateTime(event) < now;
+export function isSpent(event: WatchEvent, now: Date): boolean {
+  return event.rule.kind === 'once' ? anchorDateTime(event) < now : hasExpired(event, now);
 }

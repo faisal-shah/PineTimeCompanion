@@ -27,7 +27,8 @@ test('EventRecord golden vector: weekly Quran practice', () => {
   };
   assert.equal(
     hex(encodeEventMessage(0, event)),
-    '010100' + '0100021100ea07070d2a01' + '517572616e207072616374696365' + '00'.repeat(10) + '00ae556a'
+    // trailing '00000000' is the end date: year 0 = never ends
+    '010200' + '0100021100ea07070d2a01' + '517572616e207072616374696365' + '00'.repeat(10) + '00ae556a' + '00000000'
   );
   // decoder round-trips the encoder
   assert.deepEqual(decodeEventRecord(encodeEventRecord(event)), event);
@@ -46,7 +47,7 @@ test('EventRecord golden vector: daily Brush teeth', () => {
   };
   assert.equal(
     hex(encodeEventMessage(1, event)),
-    '010101' + '020001141eea0701010101' + '427275736820746565746800' + '00'.repeat(12) + '00000000'
+    '010201' + '020001141eea0701010101' + '427275736820746565746800' + '00'.repeat(12) + '00000000' + '00000000'
   );
 });
 
@@ -63,7 +64,7 @@ test('EventRecord golden vector: one-shot Dentist', () => {
   };
   assert.equal(
     hex(encodeEventMessage(2, event)),
-    '010102' + '030000090fea0708010001' + '44656e74697374' + '00'.repeat(17) + '00000000'
+    '010202' + '030000090fea0708010001' + '44656e74697374' + '00'.repeat(17) + '00000000' + '00000000'
   );
 });
 
@@ -94,7 +95,7 @@ test('title truncation respects UTF-8 boundaries', () => {
   assert.equal(encodeTitle('abcdefghijklmnopqrstuvwxyz').length, 23);
 });
 
-test('record is always exactly 35 bytes with NUL-padded title', () => {
+test('record is always exactly 43 bytes with NUL-padded title', () => {
   const event: WatchEvent = {
     id: 0xffff,
     title: '',
@@ -106,7 +107,7 @@ test('record is always exactly 35 bytes with NUL-padded title', () => {
     lastModified: 0,
   };
   const record = encodeEventRecord(event);
-  assert.equal(record.length, 39);
+  assert.equal(record.length, 43);
   assert.equal(record[10], 0x00); // disabled
   assert.equal(record[9], 31); // day of month
   assert.ok(record.subarray(11).every((b) => b === 0));

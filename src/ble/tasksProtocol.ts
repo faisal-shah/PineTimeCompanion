@@ -38,8 +38,11 @@ export function decodeTaskRecord(record: Uint8Array): WatchTask {
   };
 }
 
+/** Must match TaskService's record version on the watch. */
+export const TASK_RECORD_VERSION = 1;
+
 export function encodeTaskMessage(index: number, task: WatchTask): Uint8Array {
-  return encodeRecordMessage(index, encodeTaskRecord(task));
+  return encodeRecordMessage(index, encodeTaskRecord(task), TASK_RECORD_VERSION);
 }
 
 /** Phone override of the watch's streak counter. */

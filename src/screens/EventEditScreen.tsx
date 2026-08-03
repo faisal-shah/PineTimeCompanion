@@ -10,6 +10,7 @@ import { useWatchStore } from '../storage/store';
 import { newItemId, withItems } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
+import { Hint } from '../ui/Hint';
 import { Button } from '../ui/Button';
 import { RuleKind, WEEKDAY_LABELS, WatchEvent } from '../model/types';
 import { upcoming } from '../model/recurrence';
@@ -41,6 +42,8 @@ export function EventEditScreen({ navigation, route }: Props) {
   const [weekdayMask, setWeekdayMask] = useState(existing?.rule.weekdayMask ?? 0x3e); // Mon-Fri
   const [dayOfMonth, setDayOfMonth] = useState(existing?.rule.dayOfMonth ?? 1);
   const [anchorDate, setAnchorDate] = useState(existing?.anchorDate ?? todayIso());
+  const [endDate, setEndDate] = useState<string | undefined>(existing?.endDate);
+  const [endOpen, setEndOpen] = useState(false);
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
   const [timeOpen, setTimeOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
@@ -52,6 +55,10 @@ export function EventEditScreen({ navigation, route }: Props) {
       hour,
       minute,
       anchorDate,
+      // Only recurring rules can end; a one-shot ends at its anchor by
+      // definition, and storing an end for it would be a field the watch
+      // ignores and the user can still see.
+      ...(kind !== 'once' && endDate !== undefined ? { endDate } : {}),
       enabled,
       lastModified: 0, // stamped at save time
       rule:
@@ -63,7 +70,7 @@ export function EventEditScreen({ navigation, route }: Props) {
               ? { kind, weekdayMask }
               : { kind, dayOfMonth },
     }),
-    [existing, watch, title, hour, minute, anchorDate, enabled, kind, intervalDays, weekdayMask, dayOfMonth]
+    [existing, watch, title, hour, minute, anchorDate, endDate, enabled, kind, intervalDays, weekdayMask, dayOfMonth]
   );
 
   const preview = useMemo(() => upcoming(draft, new Date(), 3), [draft]);
@@ -171,6 +178,36 @@ export function EventEditScreen({ navigation, route }: Props) {
         }}
       />
 
+      {kind !== 'once' && (
+        <>
+          <Text style={styles.label}>Until</Text>
+          <View style={styles.row}>
+            <Pressable style={[styles.field, { flex: 1 }]} onPress={() => setEndOpen(true)} testID="end-date">
+              <Text style={styles.fieldValue}>
+                {endDate === undefined
+                  ? 'No end date'
+                  : isoToDate(endDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </Pressable>
+            {endDate !== undefined && (
+              <Pressable style={styles.clearEnd} onPress={() => setEndDate(undefined)} testID="clear-end-date">
+                <Text style={styles.clearEndText}>Clear</Text>
+              </Pressable>
+            )}
+          </View>
+          <Hint>The last day it can fire. After that the watch stops showing it.</Hint>
+          <DatePicker
+            visible={endOpen}
+            value={endDate ?? anchorDate}
+            onCancel={() => setEndOpen(false)}
+            onConfirm={(iso) => {
+              setEndDate(iso);
+              setEndOpen(false);
+            }}
+          />
+        </>
+      )}
+
       <View style={[styles.row, { justifyContent: 'space-between', marginTop: spacing(1) }]}>
         <Text style={styles.inlineLabel}>Enabled</Text>
         <Switch value={enabled} onValueChange={setEnabled} trackColor={{ true: colors.accent }} />
@@ -227,6 +264,8 @@ function Stepper({
 const styles = StyleSheet.create({
   label: { color: colors.textDim, marginTop: spacing(2), marginBottom: spacing(1), fontSize: 13, textTransform: 'uppercase' },
   input: { backgroundColor: colors.card, color: colors.text, borderRadius: 10, paddingHorizontal: spacing(2), height: 48 },
+  clearEnd: { paddingHorizontal: spacing(1.5), paddingVertical: spacing(1), marginLeft: spacing(1) },
+  clearEndText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   field: { backgroundColor: colors.card, borderRadius: 12, paddingVertical: spacing(2), paddingHorizontal: spacing(2) },
   fieldValue: { color: colors.text, fontSize: 18, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },

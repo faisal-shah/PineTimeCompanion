@@ -9,14 +9,30 @@ import { Watch, WatchEvent, WatchTask } from '../model/types';
 import { ListItem, ListMergeRules, ListSyncBase, MergeNotice, SyncedList, looksLikeReset, mergeList } from '../model/listSync';
 import { ListDigest, encodeAbortSync, encodeBeginSync, encodeCommitSync, encodeRecordMessage } from './listProtocol';
 import { BRIDGE_CHAR, BridgeCharId, TransportError, WatchTransport, withConnection } from './transport';
-import { decodeDigest, decodeEventRecord, encodeEventRecord } from './scheduleProtocol';
-import { TaskDigest, decodeTaskDigest, decodeTaskRecord, encodeSetStreak, encodeTaskRecord } from './tasksProtocol';
+import { SCHEDULE_RECORD_VERSION, decodeDigest, decodeEventRecord, encodeEventRecord } from './scheduleProtocol';
+import { TASK_RECORD_VERSION, TaskDigest, decodeTaskDigest, decodeTaskRecord, encodeSetStreak, encodeTaskRecord } from './tasksProtocol';
 
-const MIN_MTU = 48; // largest record message (event, 42 B) + ATT overhead
+const MIN_MTU = 50; // largest record message (event: 3 + 43 B) + ATT overhead
 const randomVersion = () => 1 + Math.floor(Math.random() * 0xfffffffe);
 const nowSec = () => Math.floor(Date.now() / 1000);
 
 /** Empty watch when this device has synced before — probably a wipe, ask the user. */
+/**
+ * The watch and this app disagree about the record layout. Whichever is older
+ * needs updating; the message says which, because "BLE_ATT_ERR_UNLIKELY" does
+ * not help anyone.
+ */
+export class ProtocolVersionError extends TransportError {
+  constructor(label: string, expected: number, actual: number) {
+    super(
+      actual > expected
+        ? `This watch's ${label} uses a newer format (v${actual}) than this app understands (v${expected}). Update the app.`
+        : `This watch's ${label} uses an older format (v${actual}) than this app speaks (v${expected}). Update the watch firmware.`,
+    );
+    this.name = 'ProtocolVersionError';
+  }
+}
+
 export class ListResetError extends TransportError {
   constructor(label: string) {
     super(`the watch ${label} is empty but this device has synced before`);
@@ -28,6 +44,19 @@ export class ListResetError extends TransportError {
 export interface ListSpec<T extends ListItem, D extends ListDigest> {
   /** used in user-facing error text, e.g. "schedule", "task list" */
   label: string;
+  /**
+   * The record layout this app speaks, matched against the byte the watch puts
+   * at the front of its digest.
+   *
+   * The record layout is simultaneously the BLE protocol and the watch's
+   * on-flash format, so a mismatch is not a degraded sync, it is two programs
+   * disagreeing about where the fields are. Refusing is the only safe answer,
+   * and saying which side is behind is the difference between a fixable message
+   * and a raw GATT error.
+   */
+  protocolVersion: number;
+  /** The RecordMessage version byte; the watch rejects anything else. */
+  recordVersion: number;
   chars: { sync: BridgeCharId; digest: BridgeCharId; read: BridgeCharId };
   rules: ListMergeRules<T>;
   encodeRecord(item: T): Uint8Array;
@@ -59,7 +88,7 @@ async function pushList<T extends ListItem, D extends ListDigest>(transport: Wat
   try {
     await transport.write(spec.chars.sync, encodeBeginSync(items.length, version));
     for (const [index, item] of items.entries()) {
-      await transport.write(spec.chars.sync, encodeRecordMessage(index, spec.encodeRecord(item)));
+      await transport.write(spec.chars.sync, encodeRecordMessage(index, spec.encodeRecord(item), spec.recordVersion));
     }
     await transport.write(spec.chars.sync, encodeCommitSync(items.length));
   } catch (e) {
@@ -100,6 +129,9 @@ export async function syncList<T extends ListItem, D extends ListDigest>(
     }
 
     const digest = spec.decodeDigest(await transport.read(spec.chars.digest));
+    if (digest.protocolVersion !== spec.protocolVersion) {
+      throw new ProtocolVersionError(spec.label, spec.protocolVersion, digest.protocolVersion);
+    }
     const base = list.base;
     const nobodyElseWrote = base !== undefined && digest.version === base.version;
 
@@ -134,6 +166,8 @@ export async function syncList<T extends ListItem, D extends ListDigest>(
 // ---- concrete list specs ----
 
 export const scheduleSpec: ListSpec<WatchEvent, ListDigest> = {
+  protocolVersion: 2, // 43-byte records, with the recurring end date
+  recordVersion: SCHEDULE_RECORD_VERSION,
   label: 'schedule',
   chars: { sync: BRIDGE_CHAR.scheduleSync, digest: BRIDGE_CHAR.scheduleDigest, read: BRIDGE_CHAR.eventRead },
   rules: {
@@ -152,6 +186,8 @@ export const scheduleSpec: ListSpec<WatchEvent, ListDigest> = {
 };
 
 export const taskSpec: ListSpec<WatchTask, TaskDigest> = {
+  protocolVersion: 1,
+  recordVersion: TASK_RECORD_VERSION,
   label: 'task list',
   chars: { sync: BRIDGE_CHAR.tasksSync, digest: BRIDGE_CHAR.tasksDigest, read: BRIDGE_CHAR.taskRead },
   rules: {

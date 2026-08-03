@@ -47,6 +47,11 @@ export interface WatchEvent extends ListItem {
   // bytes on sync; lastModified drives merge conflicts).
   hour: number; // 0-23, watch-local
   minute: number; // 0-59
+  /**
+   * Last day a recurring rule may fire, YYYY-MM-DD local, inclusive. Undefined
+   * means it never ends. Meaningless for a one-shot, which ends at its anchor.
+   */
+  endDate?: string;
   /** rule start date (and the date of a one-shot), YYYY-MM-DD local */
   anchorDate: string;
   rule: EventRule;

@@ -23,7 +23,9 @@ export const EVENT_READ_CHAR_UUID = '00060003-78fc-48fe-8e23-433b3a1942d0';
 
 export const PROTOCOL_VERSION = 1;
 
-export const EVENT_RECORD_SIZE = 39;
+export const EVENT_RECORD_SIZE = 43;
+/** Must match ScheduleService::eventRecordVersion on the watch. */
+export const SCHEDULE_RECORD_VERSION = 2;
 export const SCHEDULE_DIGEST_SIZE = 7;
 
 export function encodeEventRecord(event: WatchEvent): Uint8Array {
@@ -40,6 +42,14 @@ export function encodeEventRecord(event: WatchEvent): Uint8Array {
   record[10] = event.enabled ? 0x01 : 0x00;
   record.set(encodeTitle(event.title), 11);
   record.set(u32le(event.lastModified >>> 0), 35);
+  // End date, inclusive. All-zero (year 0) means the rule never ends, which is
+  // why a date is stored rather than a day count: 0 is then unambiguous.
+  if (event.endDate !== undefined) {
+    const [ey, em, ed] = event.endDate.split('-').map(Number);
+    record.set(u16le(ey), 39);
+    record[41] = em;
+    record[42] = ed;
+  }
   return record;
 }
 
@@ -63,6 +73,7 @@ export function decodeEventRecord(record: Uint8Array): WatchEvent {
           ? { kind, weekdayMask: param & 0x7f }
           : { kind, dayOfMonth: Math.min(31, Math.max(1, param)) };
   const year = u16leAt(record, 5);
+  const endYear = u16leAt(record, 39);
   return {
     id: u16leAt(record, 0),
     rule,
@@ -72,11 +83,16 @@ export function decodeEventRecord(record: Uint8Array): WatchEvent {
     enabled: (record[10] & 0x01) !== 0,
     title: decodeTitle(record.subarray(11, 35)),
     lastModified: u32leAt(record, 35),
+    // Year 0 is the watch's "never ends"; keep it undefined rather than
+    // inventing a date, so round-tripping a record leaves it byte-identical.
+    ...(endYear === 0
+      ? {}
+      : { endDate: `${endYear}-${String(record[41]).padStart(2, '0')}-${String(record[42]).padStart(2, '0')}` }),
   };
 }
 
 export function encodeEventMessage(index: number, event: WatchEvent): Uint8Array {
-  return encodeRecordMessage(index, encodeEventRecord(event));
+  return encodeRecordMessage(index, encodeEventRecord(event), SCHEDULE_RECORD_VERSION);
 }
 
 export function decodeDigest(payload: Uint8Array): ListDigest {
