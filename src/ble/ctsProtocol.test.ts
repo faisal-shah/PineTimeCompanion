@@ -38,7 +38,7 @@ class FakeTransport implements WatchTransport {
   async read(): Promise<Uint8Array> {
     return new Uint8Array();
   }
-  async write(charId: number): Promise<void> {
+  async write(charId: number, _payload: Uint8Array): Promise<void> {
     this.writes.push(charId);
   }
   async writeWithoutResponse(): Promise<void> {}
@@ -58,7 +58,7 @@ test('every app operation sets the watch clock', async () => {
 test('a watch that rejects the clock write does not fail the operation', async () => {
   // Best-effort: an older or busy watch must not break a sync.
   const t = new FakeTransport();
-  t.write = async (charId: number) => {
+  t.write = async (charId: number, _payload: Uint8Array) => {
     if (charId === BRIDGE_CHAR.currentTime) throw new Error('no such characteristic');
     t.writes.push(charId);
   };
