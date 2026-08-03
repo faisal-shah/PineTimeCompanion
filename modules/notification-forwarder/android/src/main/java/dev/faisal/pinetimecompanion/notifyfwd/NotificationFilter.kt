@@ -24,6 +24,12 @@ class NotificationFilter(
     val isCall: Boolean, // notification.category == CATEGORY_CALL
     val isOngoing: Boolean, // FLAG_ONGOING_EVENT
     val isGroupSummary: Boolean, // FLAG_GROUP_SUMMARY
+    // True only when the call is ringing *in*. CATEGORY_CALL covers the whole
+    // life of a call, so one you placed yourself, and the ongoing state after
+    // answering, both arrive looking identical to an incoming call unless the
+    // direction is checked. Last field, with a default, so adding it cannot
+    // shift the meaning of any existing positional argument.
+    val isIncomingCall: Boolean = true,
   )
 
   sealed class Decision {
@@ -66,6 +72,10 @@ class NotificationFilter(
     cheapDropReason(n.packageName, n.isCall, n.isOngoing, n.isGroupSummary)?.let { return Decision.Drop(it) }
     if (n.isCall) {
       if (!forwardCalls) return Decision.Drop("calls-off")
+      // Only a ringing call is worth a buzz on the wrist. You already know
+      // about the call you just placed, and the ongoing-call notification
+      // repeats for the whole conversation.
+      if (!n.isIncomingCall) return Decision.Drop("call-not-incoming")
     } else if (n.packageName !in allowedPackages) {
       return Decision.Drop("not-allowed")
     }

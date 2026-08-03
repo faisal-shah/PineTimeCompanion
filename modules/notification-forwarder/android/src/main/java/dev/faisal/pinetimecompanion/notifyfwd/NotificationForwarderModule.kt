@@ -47,9 +47,12 @@ class NotificationForwarderModule : Module() {
       ConnectionManager.applyConfig(cfg)
       if (cfg.enabledWatches.isNotEmpty()) {
         ForwarderService.refresh(context)
+      } else {
+        // Stop it here rather than waiting for the service to notice on some
+        // later onStartCommand: nothing is guaranteed to poke it, and its
+        // ongoing notification stays in the shade until something does.
+        ForwarderService.stop(context)
       }
-      // When empty, the running service stops itself on its next onStartCommand;
-      // applyConfig already tore down the connections.
     }
 
     AsyncFunction("getConfig") {

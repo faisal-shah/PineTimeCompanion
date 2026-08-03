@@ -1,6 +1,7 @@
 package dev.faisal.pinetimecompanion.notifyfwd
 
 import android.app.Notification
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
@@ -80,6 +81,25 @@ class NotifListenerService : NotificationListenerService() {
     }
   }
 
+  /**
+   * Is this call ringing in, as opposed to one being placed or already running?
+   *
+   * Android 12 added CallStyle, which states the direction outright in
+   * EXTRA_CALL_TYPE; that is the answer whenever the dialer uses it. Older or
+   * non-CallStyle dialers say nothing, so fall back to the full-screen intent:
+   * a ringing call declares one to throw up the incoming-call UI, an outgoing
+   * or ongoing call has no reason to.
+   */
+  private fun isIncomingCall(n: Notification): Boolean {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      val callType = n.extras.getInt(Notification.EXTRA_CALL_TYPE, -1)
+      if (callType != -1) {
+        return callType == Notification.CallStyle.CALL_TYPE_INCOMING
+      }
+    }
+    return n.fullScreenIntent != null
+  }
+
   private fun extract(sbn: StatusBarNotification): NotificationFilter.Incoming {
     val n = sbn.notification
     val extras = n.extras
@@ -92,6 +112,7 @@ class NotifListenerService : NotificationListenerService() {
       title = title,
       text = text,
       isCall = n.category == Notification.CATEGORY_CALL,
+      isIncomingCall = isIncomingCall(n),
       isOngoing = (n.flags and Notification.FLAG_ONGOING_EVENT) != 0,
       isGroupSummary = (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0,
     )

@@ -99,6 +99,20 @@ class ForwarderService : Service() {
     }
 
     /**
+     * Stop the service and take its ongoing notification down with it.
+     *
+     * Called explicitly when forwarding is turned off. The service used to be
+     * left to notice an empty config on its next onStartCommand, which only
+     * happened because every posted notification poked it -- so once that poke
+     * became conditional, nothing stopped it and its notification sat in the
+     * shade forever. Turning something off should turn it off, not wait for an
+     * unrelated event to notice.
+     */
+    fun stop(context: Context) {
+      context.stopService(Intent(context, ForwarderService::class.java))
+    }
+
+    /**
      * Start the service only if it is not already up. For callers that fire per
      * notification: startForegroundService is a binder round trip into
      * ActivityManager and re-posts this service's own notification, so calling

@@ -17,7 +17,16 @@ class NotificationFilterTest {
     isCall: Boolean = false,
     isOngoing: Boolean = false,
     isGroupSummary: Boolean = false,
-  ) = Incoming(pkg, title, text, isCall, isOngoing, isGroupSummary)
+    isIncomingCall: Boolean = true,
+  ) = Incoming(
+    packageName = pkg,
+    title = title,
+    text = text,
+    isCall = isCall,
+    isOngoing = isOngoing,
+    isGroupSummary = isGroupSummary,
+    isIncomingCall = isIncomingCall,
+  )
 
   private fun filter() = NotificationFilter(own, dedupeTtlMs = 10_000, minGapMs = 500, burst = 3)
 
@@ -128,5 +137,43 @@ class NotificationFilterTest {
       val d = f.decide(notif(pkg = pkg, isCall = isCall, isOngoing = ongoing, isGroupSummary = isSummary), allowed, true, 0L)
       assertTrue("cheap=$cheap decide=$d", cheap == null || (d is Decision.Drop && d.reason == cheap))
     }
+  }
+
+  // --- call direction ---
+
+  @Test
+  fun `an outgoing call is not forwarded`() {
+    // Reported from hardware: placing a call buzzed the watch as though someone
+    // were calling in. CATEGORY_CALL spans the whole life of a call, so the
+    // direction has to be checked separately.
+    val f = NotificationFilter(own)
+    val d = f.decide(
+      notif(pkg = "com.google.android.dialer", isCall = true, isOngoing = true, isIncomingCall = false),
+      allowed,
+      forwardCalls = true,
+      nowMs = 0L,
+    )
+    assertTrue(d is Decision.Drop)
+    assertEquals("call-not-incoming", (d as Decision.Drop).reason)
+  }
+
+  @Test
+  fun `a ringing call is still forwarded`() {
+    val f = NotificationFilter(own)
+    val d = f.decide(
+      notif(pkg = "com.google.android.dialer", title = "Alice", isCall = true, isOngoing = true, isIncomingCall = true),
+      allowed,
+      forwardCalls = true,
+      nowMs = 0L,
+    )
+    assertTrue("a ringing call must survive: $d", d is Decision.ForwardCall)
+  }
+
+  @Test
+  fun `a ringing call from an unlisted dialer still survives the cheap filter`() {
+    // Calls bypass the app allowlist, and the cheap filter runs first, so the
+    // ongoing flag on a ringing call must not knock it out before that.
+    val f = NotificationFilter(own)
+    assertEquals(null, f.cheapDropReason("com.some.dialer", isCall = true, isOngoing = true, isGroupSummary = false))
   }
 }
