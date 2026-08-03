@@ -9,23 +9,9 @@ import { CurrentWeather, encodeCurrentWeather, encodeForecast, ForecastDay } fro
 import { decodeStepCount } from './stepsProtocol';
 import { BEACON_CONTROL_ENABLE } from './beaconProtocol';
 import { BRIDGE_CHAR, TransportError, WatchTransport, withConnection } from './transport';
+import { encodeCurrentTime } from './ctsProtocol';
 
-/** Standard CTS 0x2A2B write (year LE, month, day, h, m, s, dow 1=Mon..7=Sun, frac256, reason). */
-export function encodeCurrentTime(now: Date): Uint8Array {
-  const b = new Uint8Array(10);
-  const year = now.getFullYear();
-  b[0] = year & 0xff;
-  b[1] = year >> 8;
-  b[2] = now.getMonth() + 1;
-  b[3] = now.getDate();
-  b[4] = now.getHours();
-  b[5] = now.getMinutes();
-  b[6] = now.getSeconds();
-  b[7] = ((now.getDay() + 6) % 7) + 1;
-  b[8] = Math.floor((now.getMilliseconds() * 256) / 1000);
-  b[9] = 0;
-  return b;
-}
+export { encodeCurrentTime };
 
 /** New Alert (0x2A46) the way Gadgetbridge sends notifications to InfiniTime. */
 export function encodeMessageAlert(title: string, body: string): Uint8Array {

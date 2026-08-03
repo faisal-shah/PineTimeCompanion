@@ -3,6 +3,8 @@
 // react-native-ble-plx. Only bleTransport.ts cannot be exercised without a
 // physical watch.
 
+import { encodeCurrentTime } from './ctsProtocol';
+
 export const BRIDGE_CHAR = {
   scheduleSync: 0,
   scheduleDigest: 1,
@@ -87,6 +89,15 @@ export async function withConnection<T>(
     // Best-effort: a watch that refuses still handles the short writes, so
     // don't fail the whole operation over it.
     await transport.requestMtu(mtu).catch(() => undefined);
+    // Set the clock on every connection we make. The watch loses its time on
+    // power loss, and on a firmware image whose memory layout shifted, and it
+    // cannot tell that state from a real date -- it shows 1 January of the build
+    // year and computes prayer times for it, confidently. Ten bytes on a link
+    // that is already open, and it needs no pairing. Best-effort for the same
+    // reason as the MTU: never fail the user's actual operation over it. The DFU
+    // path deliberately does not come through here, so this never races a
+    // rebooting watch.
+    await transport.write(BRIDGE_CHAR.currentTime, encodeCurrentTime(new Date())).catch(() => undefined);
     return await fn();
   } finally {
     await transport.disconnect().catch(() => undefined);

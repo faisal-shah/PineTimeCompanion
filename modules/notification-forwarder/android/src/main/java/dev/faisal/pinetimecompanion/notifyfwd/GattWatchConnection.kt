@@ -191,10 +191,12 @@ class GattWatchConnection(
       val map = HashMap<WatchChar, BluetoothGattCharacteristic>()
       val ans = g.getService(WatchChar.ANS_SERVICE)
       val music = g.getService(WatchChar.MUSIC_SERVICE)
+      val cts = g.getService(WatchChar.CTS_SERVICE)
       for (wc in WatchChar.entries) {
         val service = when {
           ans?.getCharacteristic(wc.gattUuid) != null -> ans
           music?.getCharacteristic(wc.gattUuid) != null -> music
+          cts?.getCharacteristic(wc.gattUuid) != null -> cts
           else -> null
         }
         service?.getCharacteristic(wc.gattUuid)?.let { map[wc] = it }
@@ -251,6 +253,17 @@ class GattWatchConnection(
   private fun becomeReady() {
     backoff.reset()
     setState(ConnState.READY)
+    // Set the clock on every connect. The watch loses its time on power loss,
+    // and on a firmware image whose memory layout shifted, leaving it at 1
+    // January of the build year with no way to know it is wrong -- it will show
+    // that date and compute prayer times for it. A reboot is exactly what drops
+    // this link, so the reconnect is the right moment to correct it, and it
+    // needs no pairing. Ten bytes, ahead of the queue.
+    if (chars[WatchChar.CURRENT_TIME] != null) {
+      send(WatchChar.CURRENT_TIME, CtsCodec.encode(System.currentTimeMillis()))
+    } else {
+      Log.w(TAG, "$deviceId has no Current Time char; clock will not be set")
+    }
     pump()
   }
 }
