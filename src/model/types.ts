@@ -130,6 +130,29 @@ export function ruleParamByte(rule: EventRule): number {
   }
 }
 
+/**
+ * The rule line under an event's title, including its end date when it has one.
+ *
+ * Without the end here, a recurring event that stops next week looks identical
+ * to one that runs forever until the day it silently disappears from the watch.
+ */
+export function describeEvent(event: { rule: EventRule; endDate?: string }, now: Date = new Date()): string {
+  const base = describeRule(event.rule);
+  if (event.rule.kind === 'once' || event.endDate === undefined) {
+    return base;
+  }
+  const [y, m, d] = event.endDate.split('-').map(Number);
+  // Show the year unless it is this one. Without it "until Jun 30" reads the
+  // same whether the date passed years ago or is decades away, which is exactly
+  // the distinction this line exists to make.
+  const until = new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    ...(y === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+  return `${base} · until ${until}`;
+}
+
 export function describeRule(rule: EventRule): string {
   switch (rule.kind) {
     case 'once':

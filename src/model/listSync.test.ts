@@ -210,3 +210,32 @@ test('parseWatches drops records that predate the SyncedList shape', async () =>
   assert.deepEqual(parseWatches('not json'), []);
   assert.deepEqual(parseWatches('{"not":"an array"}'), []);
 });
+
+test('two events differing only by end date are not equal', () => {
+  // equal() is the merge's definition of "same information": when it says two
+  // records match, the merge is free to keep either one. Any field that
+  // encodeRecord puts on the wire must therefore be in here, or an edit to it
+  // can be silently dropped in favour of the other side's copy.
+  const a = ev(1, 'Quran practice', 100);
+  const b = { ...a, endDate: '2026-12-31' };
+  assert.equal(eventRules.equal(a, b), false, 'setting an end date is a real change');
+  assert.equal(eventRules.equal(b, { ...b }), true, 'identical copies still match');
+});
+
+test('every field encodeEventRecord writes is covered by equal', () => {
+  // Guards the whole class rather than just today's field: round-trip a record,
+  // mutate each user-settable field, and assert equal() notices.
+  const base = ev(1, 'Base', 100);
+  const mutations: Array<Partial<typeof base>> = [
+    { title: 'Other' },
+    { hour: (base.hour + 1) % 24 },
+    { minute: (base.minute + 1) % 60 },
+    { anchorDate: '2027-01-02' },
+    { endDate: '2027-06-01' },
+    { enabled: !base.enabled },
+    { rule: { kind: 'weekly', weekdayMask: 0x2a } },
+  ];
+  for (const m of mutations) {
+    assert.equal(eventRules.equal(base, { ...base, ...m }), false, `equal() must notice ${Object.keys(m)[0]}`);
+  }
+});

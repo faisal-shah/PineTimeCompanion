@@ -97,7 +97,13 @@ export async function withConnection<T>(
     // reason as the MTU: never fail the user's actual operation over it. The DFU
     // path deliberately does not come through here, so this never races a
     // rebooting watch.
-    await transport.write(BRIDGE_CHAR.currentTime, encodeCurrentTime(new Date())).catch(() => undefined);
+    await transport.write(BRIDGE_CHAR.currentTime, encodeCurrentTime(new Date())).catch((e) => {
+      // Never fail the user's actual operation over the clock. But do say so:
+      // a watch whose clock silently never gets set is precisely the fault this
+      // write exists to prevent, and the manual "Set time" button surfaces the
+      // same error properly if it keeps happening.
+      console.warn('could not set the watch clock:', (e as Error)?.message ?? e);
+    });
     return await fn();
   } finally {
     await transport.disconnect().catch(() => undefined);

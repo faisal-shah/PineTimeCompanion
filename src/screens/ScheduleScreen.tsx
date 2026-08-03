@@ -11,7 +11,7 @@ import { Hint } from '../ui/Hint';
 import { formatTime } from '../util/formatTime';
 import { showAlert } from '../ui/alert';
 import { useWatchOp } from '../ui/useWatchOp';
-import { describeRule } from '../model/types';
+import { describeEvent } from '../model/types';
 import { isSpent } from '../model/recurrence';
 import { makeTransport } from '../ble/transportFactory';
 import { ListResetError, syncSchedule } from '../ble/listSyncManager';
@@ -117,7 +117,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
             </Text>
             <View style={{ flex: 1, marginLeft: spacing(2) }}>
               <Text style={[styles.eventTitle, !item.enabled && styles.disabled]}>{item.title}</Text>
-              <Text style={styles.eventRule}>{describeRule(item.rule)}</Text>
+              <Text style={styles.eventRule}>{describeEvent(item)}</Text>
             </View>
             {/* A one-off that has been and gone will never fire again; it is
                 just holding one of the 64 slots. Say so, so it is obvious what

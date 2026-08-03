@@ -176,6 +176,7 @@ export const scheduleSpec: ListSpec<WatchEvent, ListDigest> = {
       a.hour === b.hour &&
       a.minute === b.minute &&
       a.anchorDate === b.anchorDate &&
+      a.endDate === b.endDate &&
       a.enabled === b.enabled &&
       JSON.stringify(a.rule) === JSON.stringify(b.rule),
     compare: (a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute) || a.id - b.id,
