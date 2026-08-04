@@ -18,7 +18,7 @@
 //   on receipt, so the MCU is gone before it can send an ATT Write Response.
 //   Writing it with-response reports a bogus failure on every successful update.
 
-import { BRIDGE_CHAR, TransportError, WatchTransport } from './transport';
+import { BRIDGE_CHAR, TransportError, WatchTransport, restoreConnectionPriority } from './transport';
 import { NotificationInbox } from './notificationInbox';
 import { DfuArchive } from './dfuZip';
 
@@ -97,12 +97,6 @@ export async function runDfu(
     onProgress?.({ phase: p, sent, total });
   };
 
-  // Ask for the fast connection interval before the first byte. See the note on
-  // WatchTransport.requestConnectionPriority: with the packet size fixed at 20
-  // bytes by the firmware and receipts no longer serialising the stream, the
-  // interval is what decides how long a flash takes.
-  await transport.requestConnectionPriority?.('high');
-
   const ctrl = (bytes: number[]) => transport.write(BRIDGE_CHAR.dfuControl, new Uint8Array(bytes));
   const packet = (data: Uint8Array) => transport.writeWithoutResponse(BRIDGE_CHAR.dfuPacket, data);
   // Activate+Reset only. Command (no response), and a transport error here is
@@ -117,6 +111,15 @@ export async function runDfu(
   };
 
   try {
+    // Ask for the fast connection interval before the first byte. See the note
+    // on WatchTransport.requestConnectionPriority: with the packet size fixed
+    // at 20 bytes by the firmware and receipts no longer serialising the
+    // stream, the interval is what decides how long a flash takes.
+    //
+    // Inside the try, because the subscription above is only released by the
+    // finally -- a transport that threw here would otherwise leak it.
+    await transport.requestConnectionPriority?.('high');
+
     report('start', 0);
 
     // 1. Start DFU (application image).
@@ -245,7 +248,8 @@ export async function runDfu(
     unsubscribe();
     // Hand the link back whatever happened. Leaving it at high priority would
     // keep both radios in a low-latency duty cycle long after the transfer,
-    // which is a battery cost on the watch for no benefit.
-    await transport.requestConnectionPriority?.('balanced');
+    // which is a battery cost on the watch for no benefit. Never throws: this
+    // runs right after the watch has reset itself out from under the link.
+    await restoreConnectionPriority(transport);
   }
 }

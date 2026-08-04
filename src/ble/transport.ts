@@ -72,6 +72,22 @@ export interface WatchTransport {
   requestConnectionPriority?(priority: 'high' | 'balanced'): Promise<void>;
 }
 
+/**
+ * Hand the connection interval back, from a finally, without ever throwing.
+ *
+ * A bulk transfer ends by resetting the watch or dropping the link, so this
+ * call is the one most likely to fail — and a throw from a finally replaces
+ * whatever the transfer was actually reporting. That is how a successful
+ * firmware update once came out as "Update failed".
+ */
+export async function restoreConnectionPriority(transport: WatchTransport): Promise<void> {
+  try {
+    await transport.requestConnectionPriority?.('balanced');
+  } catch {
+    // The link is already gone; the interval dies with it.
+  }
+}
+
 export class TransportError extends Error {
   constructor(message: string, readonly cause?: unknown) {
     super(message);

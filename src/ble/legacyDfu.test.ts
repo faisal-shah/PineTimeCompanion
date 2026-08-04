@@ -239,3 +239,16 @@ test('the link is handed back even when the update fails', async () => {
   await assert.rejects(runDfu(watch, makeArchive(200)));
   assert.equal(watch.priorities.at(-1), 'balanced', 'a failed flash must not leave the radio fast');
 });
+
+test('a transport that fails to hand the link back does not fail the update', async () => {
+  // The restore runs in the finally, right after the watch has reset itself out
+  // from under the link, so it is the call most likely to throw — and a throw
+  // from a finally would replace the result of an update that actually worked.
+  const watch = new MockDfuWatch(true);
+  watch.requestConnectionPriority = async (priority: 'high' | 'balanced') => {
+    watch.priorities.push(priority);
+    if (priority === 'balanced') throw new Error('device disconnected');
+  };
+  await runDfu(watch, makeArchive(200));
+  assert.deepEqual(watch.priorities, ['high', 'balanced']);
+});

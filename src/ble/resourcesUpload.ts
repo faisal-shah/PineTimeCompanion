@@ -3,7 +3,7 @@
 // resource, then delete the files the release marks obsolete. Reports byte
 // progress across the whole set so the UI can show a single bar.
 
-import { WatchTransport } from './transport';
+import { WatchTransport, restoreConnectionPriority } from './transport';
 import { FsClient } from './fsClient';
 import { ResourcesArchive, parentDirs } from './resourcesZip';
 
@@ -39,12 +39,16 @@ export async function uploadResources(
   onProgress?: (p: ResourcesProgress) => void,
 ): Promise<void> {
   const fs = new FsClient(transport);
-  // Every chunk here waits for the watch's pacing response, so this transfer is
-  // pure round-trip latency -- it gains even more from the fast connection
-  // interval than the firmware stream does, where packets at least pipeline.
-  await transport.requestConnectionPriority?.('high');
   await fs.begin();
   try {
+    // Every chunk here waits for the watch's pacing response, so this transfer
+    // is pure round-trip latency -- it gains even more from the fast connection
+    // interval than the firmware stream does, where packets at least pipeline.
+    //
+    // Inside the try so the finally always hands the interval back; raising it
+    // before fs.begin left it raised for good if begin threw.
+    await transport.requestConnectionPriority?.('high');
+
     const totalBytes = archive.files.reduce((n, f) => n + f.data.length, 0);
     let doneBytes = 0;
 
@@ -88,6 +92,6 @@ export async function uploadResources(
     }
   } finally {
     fs.end();
-    await transport.requestConnectionPriority?.('balanced');
+    await restoreConnectionPriority(transport);
   }
 }
