@@ -9,6 +9,7 @@
 //   node scripts/music-e2e.mjs   (or npm run music:e2e)
 
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import net from 'node:net';
 import { promisify } from 'node:util';
 
@@ -30,6 +31,12 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64');
 const cast = (action, ...extras) => adb('shell', 'am', 'broadcast', '-n', RECV, '-a', `${PKG}.notifyfwd.${action}`, ...extras);
 const sim = (...a) => sh('python3', [SIMCTL, ...a]).catch(() => {});
 const awake = () => sim('awake');
+const TOOLS = new URL('../../pinetime-dev-tools/', import.meta.url).pathname;
+// Land on the watchface from any state. A button press means "back" inside an
+// app but "sleep" on the watchface, so no fixed sequence is state-independent;
+// simnav.wake drives to sleep first, then wakes once. Reused rather than
+// reimplemented so both harnesses share one definition of "go home".
+const home = () => sh('python3', ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(TOOLS)}); import simnav; simnav.wake()`]);
 const tap = async (x, y) => { await awake(); await sim('--settle', '1.0', 'tap', String(x), String(y)); };
 const swipe = async (d) => { await awake(); await sim('--settle', '1.0', 'swipe', d); };
 const logDump = (...tags) => adb('logcat', '-d', '-s', ...tags);
@@ -48,6 +55,10 @@ const mediaQuery = async () => {
 await adb('shell', 'cmd', 'notification', 'allow_listener', `${PKG}/${PKG}.notifyfwd.NotifListenerService`);
 await sleep(2000);
 await cast('SET_CONFIG', '--es', 'config_b64', b64({ enabledWatches: [], allowedPackages: [], forwardCalls: true }));
+// Tear the debug session down too, not just the config. The bridge only writes
+// fields that changed, so metadata left over from an earlier run makes step 2's
+// first write a no-op and the run fails claiming the media path is broken.
+await cast('MEDIA_STOP');
 await sleep(1500);
 await adb('logcat', '-c');
 
@@ -71,11 +82,23 @@ for (const want of ['MUSIC_ARTIST', 'MUSIC_TRACK', 'MUSIC_TOTAL_LENGTH', 'MUSIC_
 console.log('2. metadata flowed through the real media path to the watch');
 
 // --- 3. watch renders it (navigate to Music, shot) ---
-await awake(); await sim('--settle', '1.0', 'button');
+// Launcher order comes from DEFAULT_USER_APP_TYPES in
+// src/displayapp/apps/CMakeLists.txt, six tiles per page. Music sits on page 2
+// at top-right; adding or removing a user app moves it, so verify rather than
+// assume -- landing on the wrong tile otherwise fails later, at the first
+// transport tap, which reads like a broken media pipeline.
+await home();
 await swipe('up'); await swipe('up');
-await tap(120, 85); // Music tile (launcher p2 top-middle)
+await sim('--settle', '1.0', 'shot', 'music-e2e-launcher');
+await tap(199, 85); // Music tile (launcher p2 top-right)
 await sleep(1000);
 await sim('--settle', '1.5', 'shot', 'music-e2e-emulator');
+const shotDir = new URL('../../pinetime-dev-tools/shots/', import.meta.url).pathname;
+const [launcherPng, musicPng] = await Promise.all([
+  readFile(`${shotDir}music-e2e-launcher.png`),
+  readFile(`${shotDir}music-e2e-emulator.png`),
+]);
+if (launcherPng.equals(musicPng)) fail('tapping the Music tile changed nothing -- launcher layout moved?');
 console.log('3. Music app open on the watch (shot music-e2e-emulator)');
 
 // --- 4. watch taps drive the phone's media session ---
