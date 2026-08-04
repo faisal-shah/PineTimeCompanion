@@ -4,7 +4,7 @@
 // (pairScan.web.ts) implements the same signature over Web Bluetooth.
 
 import { PermissionsAndroid, Platform } from 'react-native';
-import { WATCH_NAME_PATTERN } from './gattUuids';
+import { isWatchAdvertisement, watchDisplayName } from './watchAdvertisement';
 
 export interface FoundWatch {
   id: string;
@@ -33,9 +33,10 @@ export async function scanForWatches(onFound: (f: FoundWatch) => void, onDone: (
       throw new Error('Bluetooth permissions denied');
     }
   }
-  const { BleManager } = await import('react-native-ble-plx');
+  const { BleManager, ScanMode } = await import('react-native-ble-plx');
   const manager = new BleManager();
-  const seen = new Set<string>();
+  // id -> whether the entry we already reported carried a real name.
+  const reported = new Map<string, boolean>();
   let finished = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const finish = (error?: Error) => {
@@ -47,15 +48,34 @@ export async function scanForWatches(onFound: (f: FoundWatch) => void, onDone: (
     }
   };
   timer = setTimeout(finish, SCAN_TIMEOUT_MS);
-  manager.startDeviceScan(null, { allowDuplicates: false }, (scanError, device) => {
-    if (scanError) {
-      finish(scanError);
-      return;
-    }
-    if (device?.name && WATCH_NAME_PATTERN.test(device.name) && !seen.has(device.id)) {
-      seen.add(device.id);
-      onFound({ id: device.id, name: device.name, rssi: device.rssi });
-    }
-  });
+  manager.startDeviceScan(
+    null,
+    // LowLatency, not ble-plx's LowPower default: this scan runs because
+    // someone is standing there waiting for their watch to appear, for twelve
+    // seconds. A duty-cycled scan misses the scan response that carries the
+    // name, and misses whole advertisements from a watch that has settled to
+    // its one-second idle interval.
+    //
+    // allowDuplicates so a watch first seen without a name can be reported
+    // again once its scan response arrives. Suppressing duplicates meant a
+    // nameless first sighting was the only sighting.
+    { allowDuplicates: true, scanMode: ScanMode.LowLatency },
+    (scanError, device) => {
+      if (scanError) {
+        finish(scanError);
+        return;
+      }
+      if (!device || !isWatchAdvertisement(device)) {
+        return;
+      }
+      const name = watchDisplayName(device);
+      const named = device.name != null || device.localName != null;
+      const alreadyNamed = reported.get(device.id);
+      if (alreadyNamed === undefined || (named && !alreadyNamed)) {
+        reported.set(device.id, named);
+        onFound({ id: device.id, name, rssi: device.rssi });
+      }
+    },
+  );
   return { stop: () => finish() };
 }

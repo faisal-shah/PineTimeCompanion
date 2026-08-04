@@ -24,7 +24,7 @@ const BATTERY_LEVEL = '00002a19-0000-1000-8000-00805f9b34fb';
 // OTA update surface. DFU is the Nordic-legacy service (blocklisted in real Web
 // Bluetooth — reachable only over native BLE or the sim bridge). FS is the
 // Adafruit BLE filesystem. DIS carries the firmware version string.
-const DFU_SERVICE = '00001530-1212-efde-1523-785feabcd123';
+export const DFU_SERVICE = '00001530-1212-efde-1523-785feabcd123';
 const DFU_CONTROL_POINT = '00001531-1212-efde-1523-785feabcd123';
 const DFU_PACKET = '00001532-1212-efde-1523-785feabcd123';
 const FS_SERVICE = '0000febb-0000-1000-8000-00805f9b34fb';

@@ -28,7 +28,19 @@ export function WatchPairScreen({ navigation, route }: Props) {
     setScanState('scanning');
     try {
       scanRef.current = await scanForWatches(
-        (f) => setFound((prev) => (prev.some((p) => p.id === f.id) ? prev : [...prev, f])),
+        // Upsert rather than ignore repeats: a watch is often matched on its
+        // advertised service before the scan response carrying the name has
+        // arrived, and the second report is what fills the name in.
+        (f) =>
+          setFound((prev) => {
+            const at = prev.findIndex((p) => p.id === f.id);
+            if (at === -1) {
+              return [...prev, f];
+            }
+            const next = [...prev];
+            next[at] = { ...next[at], name: f.name, rssi: f.rssi ?? next[at].rssi };
+            return next;
+          }),
         (scanError) => {
           setScanState('idle');
           if (scanError) {
