@@ -35,7 +35,7 @@ if (!proxyBusy) {
 }
 
 try {
-  await assertBundleFresh(path.join(DESKTOP, 'dist', 'index.html'), [path.join(ROOT, 'src'), path.join(ROOT, 'app')],
+  await assertBundleFresh(path.join(DESKTOP, 'dist', 'index.html'), [path.join(ROOT, 'src')],
     'npm run desktop:export');
 } catch (e) {
   console.error(e.message);

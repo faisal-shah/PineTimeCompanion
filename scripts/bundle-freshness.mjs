@@ -16,12 +16,7 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'dist-web', 'build', '.exp
 
 async function newestMtime(dir) {
   let newest = 0;
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return 0;
-  }
+  const entries = await readdir(dir, { withFileTypes: true });
   for (const e of entries) {
     if (e.name.startsWith('.') || SKIP.has(e.name)) continue;
     const full = path.join(dir, e.name);
@@ -46,7 +41,16 @@ export async function assertBundleFresh(bundleIndex, roots, rebuildWith) {
     throw new Error(`no bundle at ${bundleIndex} -- run: ${rebuildWith}`);
   }
   let newestSrc = 0;
-  for (const r of roots) newestSrc = Math.max(newestSrc, await newestMtime(r));
+  for (const r of roots) {
+    try {
+      newestSrc = Math.max(newestSrc, await newestMtime(r));
+    } catch {
+      // A root that cannot be read used to count as "nothing changed", so a
+      // renamed source directory would have made this check pass everything
+      // silently -- which is the failure it exists to prevent.
+      throw new Error(`cannot read source root ${r}, so bundle freshness cannot be established`);
+    }
+  }
   if (newestSrc > built) {
     const age = Math.round((newestSrc - built) / 60000);
     throw new Error(

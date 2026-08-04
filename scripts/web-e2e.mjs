@@ -48,7 +48,7 @@ if (!fs.existsSync(path.join(root, 'index.html'))) {
   process.exit(2);
 }
 try {
-  await assertBundleFresh(path.join(root, 'index.html'), [path.resolve('src'), path.resolve('app')],
+  await assertBundleFresh(path.join(root, 'index.html'), [path.resolve('src')],
     `npx expo export --platform web --output-dir ${DIST}`);
 } catch (e) {
   console.error(e.message);
