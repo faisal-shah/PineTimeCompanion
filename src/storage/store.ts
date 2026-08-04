@@ -31,12 +31,20 @@ export function parseWatches(raw: string | null): Watch[] {
   }
 }
 
+/**
+ * Read the stored watches. Throws if storage itself could not be read.
+ *
+ * Deliberately not caught here. "Storage would not answer" is a different fact
+ * from "there are no watches", and the caller persists whatever this returns:
+ * swallowing the error returned an empty list, which was then written straight
+ * back over the real one. That list holds the schedule and task base, which is
+ * the only copy of a watch's data while its firmware is being replaced.
+ *
+ * A parse failure or an unrecognised shape still yields an empty list, which is
+ * the intended behaviour -- stale shapes are dropped, never migrated.
+ */
 export async function loadWatches(): Promise<Watch[]> {
-  try {
-    return parseWatches(await AsyncStorage.getItem(STORAGE_KEY));
-  } catch {
-    return [];
-  }
+  return parseWatches(await AsyncStorage.getItem(STORAGE_KEY));
 }
 
 export async function saveWatches(watches: Watch[]): Promise<void> {

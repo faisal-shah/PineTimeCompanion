@@ -22,11 +22,17 @@ export const stackScreenOptions = {
   contentStyle: { backgroundColor: colors.background },
 } as const;
 
-export function useAppBootstrap(): { loaded: boolean; store: WatchStore } {
+export type BootstrapStatus = 'loading' | 'ready' | 'unreadable';
+
+export function useAppBootstrap(): { loaded: boolean; status: BootstrapStatus; store: WatchStore } {
   const [watches, setWatches] = useState<Watch[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [unreadable, setUnreadable] = useState(false);
 
   useEffect(() => {
+    // `loaded` gates the save effect below, so it must not flip on a failed
+    // read: an empty list would be written straight over the stored one, taking
+    // the schedule and task base with it. Staying unloaded keeps the data.
     loadWatches().then(async (w) => {
       // Move any beacon private key still embedded in the persisted blob into
       // the OS keystore, then persist the blanked records (the save effect below
@@ -38,7 +44,7 @@ export function useAppBootstrap(): { loaded: boolean; store: WatchStore } {
       }
       setWatches(w);
       setLoaded(true);
-    });
+    }).catch(() => setUnreadable(true));
   }, []);
 
   useEffect(() => {
@@ -69,5 +75,5 @@ export function useAppBootstrap(): { loaded: boolean; store: WatchStore } {
 
   const store: WatchStore = useMemo(() => ({ watches, upsertWatch, removeWatch }), [watches, upsertWatch, removeWatch]);
 
-  return { loaded, store };
+  return { loaded, status: unreadable ? 'unreadable' : loaded ? 'ready' : 'loading', store };
 }

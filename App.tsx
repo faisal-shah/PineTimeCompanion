@@ -1,4 +1,5 @@
 import React from 'react';
+import { BootstrapError } from './src/ui/BootstrapError';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from './src/ui/keyboard';
@@ -27,7 +28,11 @@ import { navTheme, stackScreenOptions, useAppBootstrap } from './src/app/useAppB
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const { loaded, store } = useAppBootstrap();
+  const { loaded, status, store } = useAppBootstrap();
+
+  if (status === 'unreadable') {
+    return <BootstrapError />;
+  }
 
   if (!loaded) {
     return null;

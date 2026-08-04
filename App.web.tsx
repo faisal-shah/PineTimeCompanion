@@ -5,6 +5,7 @@
 // shared unchanged (the extra route types erase at compile time).
 
 import React from 'react';
+import { BootstrapError } from './src/ui/BootstrapError';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
@@ -31,7 +32,11 @@ import { DesktopBlePairingPrompt } from './src/ui/DesktopBlePairingPrompt.web';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const { loaded, store } = useAppBootstrap();
+  const { loaded, status, store } = useAppBootstrap();
+
+  if (status === 'unreadable') {
+    return <BootstrapError />;
+  }
 
   if (!loaded) {
     return null;
