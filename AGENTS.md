@@ -21,3 +21,16 @@ release workflow **copies** it from the repo rather than generating it, so a fre
 ~1–2 MB copy lands in history every release (a handful so far). If that
 accumulation is worth removing, generate the PDF in CI from `docs/feature-guide.html`
 and stop committing it; until then it must stay, because CI reads it.
+
+<!-- memory-skill:start -->
+# Project Memory
+
+Before doing work, read `.memory/context.md`, `.memory/progress.md`, and
+`.memory/lessons.md`. Read `.memory/plan.md` only when original intent is
+needed.
+
+A task is not done until `.memory/progress.md` matches reality. After each
+completed task or gate, update `.memory/progress.md` and
+`.memory/lessons.md`. Reconcile memory before coding if it disagrees with the
+repository.
+<!-- memory-skill:end -->

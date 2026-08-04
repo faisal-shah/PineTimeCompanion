@@ -367,3 +367,9 @@ auto-reconnects.
   digest verification) + companion functions (CTS time, New Alert message, battery)
 - `src/storage/store.ts` — AsyncStorage-persisted watch list
 - `src/screens/` — WatchList, WatchDetail, EventEdit, WatchPair
+
+## Agent handoff
+
+Agents continuing multi-companion work must read `.memory/context.md`,
+`.memory/progress.md`, and `.memory/lessons.md`. Automated implementation is
+complete; the remaining work is real-phone fleet acceptance and evidence.
