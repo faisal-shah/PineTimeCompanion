@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertBundleFresh } from './bundle-freshness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -31,6 +32,14 @@ const proxyBusy = await new Promise((resolve) => {
 if (!proxyBusy) {
   children.push(spawn(process.execPath, [path.join(ROOT, 'scripts/ws-tcp-proxy.mjs')], { stdio: 'inherit', detached: true }));
   await sleep(500);
+}
+
+try {
+  await assertBundleFresh(path.join(DESKTOP, 'dist', 'index.html'), [path.join(ROOT, 'src'), path.join(ROOT, 'app')],
+    'npm run desktop:export');
+} catch (e) {
+  console.error(e.message);
+  process.exit(2);
 }
 
 const electronBin = path.join(DESKTOP, 'node_modules', '.bin', 'electron');
@@ -91,23 +100,29 @@ await evalJs(`(() => {
 await click('[data-testid="add-watch"]');
 await waitFor(`[data-testid="watch-${WATCH_NAME}"]`);
 await click(`[data-testid="watch-${WATCH_NAME}"]`);
-await waitFor('[data-testid="sync-watch"]');
+// The hub is identified by its feature tiles; sync moved onto the Schedule
+// screen, so sync-watch does not exist here. Keep this in step with
+// scripts/web-e2e.mjs, which drives the same screens.
+await waitFor('[data-testid="feature-Schedule"]');
 await evalJs(`[...document.querySelectorAll('div')].filter((d) => /^(Re-)?pair$/i.test(d.textContent)).at(-1)?.click()`);
 await waitFor('[data-testid="pair-simulator"]');
 const simLabel = await evalJs(`document.querySelector('[data-testid="pair-simulator"]').textContent`);
 console.log('2. pair screen | sim entry:', JSON.stringify(simLabel));
 await click('[data-testid="pair-simulator"]');
-await waitFor('[data-testid="sync-watch"]');
+await waitFor('[data-testid="feature-Schedule"]');
 
-await click('[data-testid="sync-watch"]');
-await sleep(4000);
-const syncLabel = await evalJs(`document.querySelector('[data-testid="sync-watch"]').textContent`);
-console.log('3. sync:', JSON.stringify(syncLabel));
-
+// Set time and Battery are hub actions; do them before leaving the hub.
 await evalJs(`[...document.querySelectorAll('div')].filter((d) => /^Set time$/.test(d.textContent)).at(-1)?.click()`);
 await sleep(2500);
 await evalJs(`[...document.querySelectorAll('div')].filter((d) => /^Battery$/.test(d.textContent)).at(-1)?.click()`);
 await sleep(2500);
+
+await click('[data-testid="feature-Schedule"]');
+await waitFor('[data-testid="sync-watch"]');
+await click('[data-testid="sync-watch"]');
+await sleep(4000);
+const syncLabel = await evalJs(`document.querySelector('[data-testid="sync-watch"]').textContent`);
+console.log('3. sync:', JSON.stringify(syncLabel));
 
 const batteryPersisted = await evalJs(`(() => {
   const w = JSON.parse(localStorage.getItem('pinetime-companion/watches/v1') ?? '[]');

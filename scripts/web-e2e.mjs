@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import os from 'node:os';
+import { assertBundleFresh } from './bundle-freshness.mjs';
 
 const DIST = process.argv[2] ?? 'dist-web';
 const HTTP_PORT = 8099;
@@ -44,6 +45,13 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const root = path.resolve(DIST);
 if (!fs.existsSync(path.join(root, 'index.html'))) {
   console.error(`No index.html in ${root} — run: npx expo export --platform web --output-dir ${DIST}`);
+  process.exit(2);
+}
+try {
+  await assertBundleFresh(path.join(root, 'index.html'), [path.resolve('src'), path.resolve('app')],
+    `npx expo export --platform web --output-dir ${DIST}`);
+} catch (e) {
+  console.error(e.message);
   process.exit(2);
 }
 createServer(async (req, res) => {
