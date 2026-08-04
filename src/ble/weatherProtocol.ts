@@ -4,8 +4,10 @@
 // write characteristic, discriminated by byte[0]. All little-endian; temperatures
 // are centidegrees Celsius (21.5°C -> 2150); the watch converts to °F itself.
 
-export const WEATHER_SERVICE_UUID = '00050000-78fc-48fe-8e23-433b3a1942d0';
-export const WEATHER_CHAR_UUID = '00050001-78fc-48fe-8e23-433b3a1942d0';
+import { GATT_CHARACTERISTICS } from './generated/companionProtocol';
+
+export const WEATHER_SERVICE_UUID = GATT_CHARACTERISTICS.weather.service;
+export const WEATHER_CHAR_UUID = GATT_CHARACTERISTICS.weather.characteristic;
 
 export const MAX_FORECAST_DAYS = 5;
 const LOCATION_BYTES = 32;

@@ -37,6 +37,10 @@ class SimTcpWatchConnection(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val queue = Channel<Pair<WatchChar, ByteArray>>(capacity = 32, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
   private val backoff = Backoff()
+  // Retains the live socket so stop() can close it synchronously — coroutine
+  // cancellation cannot unblock a blocking read — and forbids reconnecting once
+  // stopped, so pause() never returns while the forwarding link is still usable.
+  private val socketGate = ActiveSocketGate()
   @Volatile private var running = false
   @Volatile private var current: ConnState = ConnState.IDLE
 
@@ -55,6 +59,10 @@ class SimTcpWatchConnection(
 
   override fun stop() {
     running = false
+    // Close the live socket first: this unblocks the read parked in serve() and
+    // makes any in-flight write fail, so the link is dead before we return. Only
+    // then cancel the coroutines.
+    socketGate.stop()
     scope.cancel()
   }
 
@@ -63,20 +71,33 @@ class SimTcpWatchConnection(
   }
 
   private suspend fun runLoop() {
-    while (running && scope.isActive) {
+    while (running && scope.isActive && !socketGate.isStopped) {
+      var socket: Socket? = null
       try {
         setState(ConnState.CONNECTING)
-        Socket().use { socket ->
-          socket.connect(InetSocketAddress(host, port), 8000)
-          backoff.reset()
-          setState(ConnState.READY)
-          Log.i(TAG, "connected to sim $deviceId")
-          serve(socket)
+        val s = Socket()
+        socket = s
+        // Publish before connecting so a stop() during the blocking connect or
+        // read closes this exact socket. If stop() already fired, do not
+        // reconnect: close the fresh socket and leave the loop.
+        if (!socketGate.publish(s)) {
+          runCatching { s.close() }
+          break
         }
+        s.connect(InetSocketAddress(host, port), 8000)
+        backoff.reset()
+        setState(ConnState.READY)
+        Log.i(TAG, "connected to sim $deviceId")
+        serve(s)
       } catch (e: Exception) {
         Log.w(TAG, "sim link to $deviceId dropped: ${e.message}")
+      } finally {
+        socket?.let {
+          socketGate.clear(it)
+          runCatching { it.close() }
+        }
       }
-      if (!running) break
+      if (!running || socketGate.isStopped) break
       setState(ConnState.BACKOFF)
       delay(backoff.nextDelayMs())
     }

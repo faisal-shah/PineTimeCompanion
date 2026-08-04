@@ -6,16 +6,17 @@
 
 import { WatchTask } from '../model/types';
 import { ListDigest, decodeListDigest, decodeTitle, encodeRecordMessage, encodeTitle, u16le, u16leAt, u32le, u32leAt } from './listProtocol';
+import { GATT_CHARACTERISTICS, RECORDS } from './generated/companionProtocol';
 
 // Service byte 0x0a — 0x07 (00070000) is already the Prayer service.
-export const TASK_SERVICE_UUID = '000a0000-78fc-48fe-8e23-433b3a1942d0';
-export const TASK_SYNC_CHAR_UUID = '000a0001-78fc-48fe-8e23-433b3a1942d0';
-export const TASK_DIGEST_CHAR_UUID = '000a0002-78fc-48fe-8e23-433b3a1942d0';
-export const TASK_READ_CHAR_UUID = '000a0003-78fc-48fe-8e23-433b3a1942d0';
+export const TASK_SERVICE_UUID = GATT_CHARACTERISTICS.tasksSync.service;
+export const TASK_SYNC_CHAR_UUID = GATT_CHARACTERISTICS.tasksSync.characteristic;
+export const TASK_DIGEST_CHAR_UUID = GATT_CHARACTERISTICS.tasksDigest.characteristic;
+export const TASK_READ_CHAR_UUID = GATT_CHARACTERISTICS.taskRead.characteristic;
 
-export const PROTOCOL_VERSION = 1;
-export const TASK_RECORD_SIZE = 31; // [id u16][order u8][title 24][lastModified u32]
-export const TASK_DIGEST_SIZE = 9; // [protoVer][capacity][count][version u32][streak u16]
+export const PROTOCOL_VERSION = RECORDS.task.protocol_version;
+export const TASK_RECORD_SIZE = RECORDS.task.record_size; // [id u16][order u8][title 24][lastModified u32]
+export const TASK_DIGEST_SIZE = RECORDS.task.digest_size; // [protoVer][capacity][count][version u32][streak u16]
 
 export function encodeTaskRecord(task: WatchTask): Uint8Array {
   const r = new Uint8Array(TASK_RECORD_SIZE); // zero-filled: title NUL padding
@@ -39,7 +40,7 @@ export function decodeTaskRecord(record: Uint8Array): WatchTask {
 }
 
 /** Must match TaskService's record version on the watch. */
-export const TASK_RECORD_VERSION = 1;
+export const TASK_RECORD_VERSION = RECORDS.task.record_version;
 
 export function encodeTaskMessage(index: number, task: WatchTask): Uint8Array {
   return encodeRecordMessage(index, encodeTaskRecord(task), TASK_RECORD_VERSION);

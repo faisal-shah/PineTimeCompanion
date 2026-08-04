@@ -1,7 +1,7 @@
 # PineTime Companion
 
 Companion app for PineTime watches running [our InfiniTime fork](../InfiniTime)
-(branch `scheduler`). Create named watches, build each one a schedule of recurring
+(branch `family-features`). Create named watches, build each one a schedule of recurring
 events (once / every-N-days / weekly / monthly), and sync over the InfiniTime
 Schedule Service. Also: turn a watch into a Find My / OpenHaystack beacon and
 **locate it in-app on a map** (see below); configure per-watch
@@ -91,10 +91,11 @@ host alias), which always works. This also depends on the network-security-confi
 the plain-HTTP Metro connection is blocked. If the loop ever breaks, a cold boot of the
 emulator (`-no-snapshot -wipe-data`) restores a clean state.
 
-The emulator reaches the host's bridge at `10.0.2.2:18632`. Every protocol byte and
-firmware code path is identical to real BLE; only the radio is replaced by TCP
-(`src/ble/tcpTransport.ts` vs `src/ble/bleTransport.ts`, selected per watch by
-device-id shape in `src/ble/transportFactory.ts`).
+The emulator reaches the host's bridge at `10.0.2.2:18632`. GATT payloads and
+portable firmware service logic use the same protocol as a real watch. TCP
+replaces RF, controller behavior, and SMP; virtual link security is injected
+explicitly for tests (`src/ble/tcpTransport.ts` vs `src/ble/bleTransport.ts`,
+selected per watch by device-id shape in `src/ble/transportFactory.ts`).
 
 ### Web + desktop against the simulator
 
@@ -126,8 +127,10 @@ unprivileged user namespaces, which some kernels disable.
 ## Tests
 
 ```sh
-npm test        # protocol golden vectors (doc/ScheduleService.md) via node --test
-npx tsc --noEmit
+npm run typecheck
+npm test
+npm run test:kotlin
+npm run web:export
 ```
 
 `pinetime-dev-tools/bridge-test.mjs` is the cross-stack protocol regression against a live
@@ -145,6 +148,48 @@ overlay appears, and on Windows/Linux a passkey prompt handles InfiniTime's
 6-digit pairing (macOS pairing is OS-handled). Hardware-untested until a
 watch exists: the Web Bluetooth GATT path itself, the passkey flow, and the
 512-byte long-write assumption (`webBluetoothTransport.requestMtu`).
+
+## Pairing and repair
+
+A watch remembers up to **five companion phones**. Pairing a sixth makes the
+watch forget the **least-recently-used** one to make room.
+
+Selecting a scanned watch does not immediately save it. The app reads the
+watch's public companion-management status (`companionStatus`), and if the
+watch is already full it asks you to confirm the eviction before continuing.
+It then reads the authenticated `companionVerify` characteristic — this is
+where the OS pairing/passkey prompt appears — and only saves the watch once the
+watch has proven, over an encrypted link, that it remembers this phone. A watch
+whose firmware predates the management service can still be paired, but only
+after an explicit prompt that says the app cannot verify it. Decoding and the
+flow live in `companionManagementProtocol.ts` and `companionPairing.ts`.
+
+The watch's exclusive BLE link is held by one thing at a time. While
+notification forwarding is connected to a watch, or an app operation is
+running, the WatchDetail status strip shows what holds the link (working, in
+use, connecting, reconnecting, or idle) so a "busy" failure reads as busy, not
+as a reason to re-pair.
+
+Two separate actions on WatchDetail:
+
+- **Remove from app** forgets the watch inside this app only. The system-level
+  Bluetooth bond and the watch's own data are untouched; reconnect later with
+  Repair pairing or Pair.
+- **Repair pairing** is for when the bond itself has broken. It reads the
+  watch's public status and explains what happened: the watch cleared all
+  pairings (a one-time firmware reset bumps a reset epoch), or this phone was
+  the least-recently-used companion the watch dropped for a newer one, or the
+  bond is simply out of sync. Each resolves the same honest way — forget
+  "InfiniTime" in the phone's system Bluetooth settings, then pair again. There
+  are no hidden Android bond-removal APIs; the app opens the system settings and
+  uses only the public `createBond` / `getBondState`. On web/desktop it gives
+  the equivalent computer instructions (system Bluetooth settings/chooser, and
+  on Windows the registry key that holds a stale pairing). Only if the normal
+  repair still fails does it point at the watch's own *Settings > Bluetooth >
+  Forget all*, warning that this affects every paired phone.
+
+Note: upgrading to the firmware that introduced companion management resets the
+watch's pairings once. After that one-time reset, pair again as above.
 
 ## Updating a watch (OTA)
 
@@ -210,7 +255,7 @@ Verified headlessly on the `tb_emu` emulator against InfiniSim: a real Android
 notification captured by the listener passes the filter (ongoing ones dropped),
 encodes, and renders on the sim watch; an incoming call renders the ring screen.
 `scripts/notify-e2e.mjs` (`npm run notify:e2e`) drives config + inject over adb
-and asserts the native forward + sim render. 19 Kotlin JUnit tests cover the
+and asserts the native forward + sim render. 21 Kotlin JUnit tests cover the
 codec (byte-matches the TS encoder), filter, framing, and backoff.
 
 Hardware-deferred (real PineTime + phone): the persistent GATT reconnect walking
@@ -313,6 +358,11 @@ auto-reconnects.
 - `src/model/` — types + recurrence math (TS twin of the firmware's `ScheduleRules.h`,
   drives the "next occurrences" preview in the event editor)
 - `src/ble/scheduleProtocol.ts` — byte-level encoders for the Schedule Service
+- `src/ble/companionManagementProtocol.ts` — decoder for the companion-management
+  status/verify payloads (capacity, count, reset epoch, eviction count, flags)
+- `src/ble/companionPairing.ts` — the verified-pairing flow (public status →
+  optional eviction confirm → authenticated verify → save)
+- `src/ble/repairAdvice.ts` — turns a broken bond into a specific repair message
 - `src/ble/syncManager.ts` — transport-agnostic sync (full-replace transaction with
   digest verification) + companion functions (CTS time, New Alert message, battery)
 - `src/storage/store.ts` — AsyncStorage-persisted watch list

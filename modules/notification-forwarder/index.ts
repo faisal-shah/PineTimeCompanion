@@ -27,6 +27,9 @@ export interface InstalledApp {
 
 export type ConnState = 'IDLE' | 'CONNECTING' | 'READY' | 'BACKOFF';
 
+/** OS bond state for a device, mirroring the native BondState enum. */
+export type BondState = 'NONE' | 'BONDING' | 'BONDED' | 'UNKNOWN';
+
 export interface ConnectionStatus {
   deviceId: string;
   state: ConnState;
@@ -41,6 +44,10 @@ export interface NowPlaying {
 export interface ForwarderStatus {
   serviceRunning: boolean;
   connections: ConnectionStatus[];
+  /** Watches whose forwarding link is currently held (paused) by a JS-driven
+   *  op (sync/OTA). Empty when nothing owns a link. Consumed by the forwarding
+   *  ownership/status UI. */
+  pausedDeviceIds: string[];
   /** Current phone media session state, when music bridging is active. */
   nowPlaying?: NowPlaying | null;
 }
@@ -58,6 +65,9 @@ declare class NotificationForwarderModule extends NativeModule<ForwarderEvents> 
   isNotificationAccessGranted(): Promise<boolean>;
   openNotificationAccessSettings(): void;
   openAppInfoSettings(): void;
+  openBluetoothSettings(): void;
+  getBondState(deviceId: string): Promise<BondState>;
+  createBond(deviceId: string): Promise<boolean>;
   is24HourFormat(): boolean;
   getInstalledApps(): Promise<InstalledApp[]>;
   getStatus(): Promise<ForwarderStatus>;

@@ -15,18 +15,19 @@ import {
   u32le,
   u32leAt,
 } from './listProtocol';
+import { GATT_CHARACTERISTICS, RECORDS } from './generated/companionProtocol';
 
-export const SCHEDULE_SERVICE_UUID = '00060000-78fc-48fe-8e23-433b3a1942d0';
-export const SYNC_COMMAND_CHAR_UUID = '00060001-78fc-48fe-8e23-433b3a1942d0';
-export const DIGEST_CHAR_UUID = '00060002-78fc-48fe-8e23-433b3a1942d0';
-export const EVENT_READ_CHAR_UUID = '00060003-78fc-48fe-8e23-433b3a1942d0';
+export const SCHEDULE_SERVICE_UUID = GATT_CHARACTERISTICS.scheduleSync.service;
+export const SYNC_COMMAND_CHAR_UUID = GATT_CHARACTERISTICS.scheduleSync.characteristic;
+export const DIGEST_CHAR_UUID = GATT_CHARACTERISTICS.scheduleDigest.characteristic;
+export const EVENT_READ_CHAR_UUID = GATT_CHARACTERISTICS.eventRead.characteristic;
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = RECORDS.schedule.protocol_version;
 
-export const EVENT_RECORD_SIZE = 43;
+export const EVENT_RECORD_SIZE = RECORDS.schedule.record_size;
 /** Must match ScheduleService::eventRecordVersion on the watch. */
-export const SCHEDULE_RECORD_VERSION = 2;
-export const SCHEDULE_DIGEST_SIZE = 7;
+export const SCHEDULE_RECORD_VERSION = RECORDS.schedule.record_version;
+export const SCHEDULE_DIGEST_SIZE = RECORDS.schedule.digest_size;
 
 export function encodeEventRecord(event: WatchEvent): Uint8Array {
   const record = new Uint8Array(EVENT_RECORD_SIZE); // zero-filled: title NUL padding

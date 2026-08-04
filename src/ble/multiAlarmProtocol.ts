@@ -9,11 +9,13 @@
 // On a READ the leading u32 is the watch's current version; on a WRITE it is
 // the EXPECTED prior version (compare-and-swap).
 
-export const MULTIALARM_SERVICE_UUID = '00090000-78fc-48fe-8e23-433b3a1942d0';
-export const MULTIALARM_CHAR_UUID = '00090001-78fc-48fe-8e23-433b3a1942d0';
+import { GATT_CHARACTERISTICS, RECORDS } from './generated/companionProtocol';
 
-export const MAX_ALARMS = 5;
-export const MULTIALARM_WIRE_SIZE = 4 + MAX_ALARMS * 4;
+export const MULTIALARM_SERVICE_UUID = GATT_CHARACTERISTICS.multiAlarm.service;
+export const MULTIALARM_CHAR_UUID = GATT_CHARACTERISTICS.multiAlarm.characteristic;
+
+export const MAX_ALARMS = RECORDS.multi_alarm.capacity;
+export const MULTIALARM_WIRE_SIZE = RECORDS.multi_alarm.record_size;
 
 export type AlarmMode = 'once' | 'daily';
 

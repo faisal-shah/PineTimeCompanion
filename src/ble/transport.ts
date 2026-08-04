@@ -4,36 +4,20 @@
 // physical watch.
 
 import { encodeCurrentTime } from './ctsProtocol';
+import { BRIDGE_CHAR } from './generated/companionProtocol';
+import type { BridgeCharId } from './generated/companionProtocol';
+import { getCoordinator } from './connectionCoordinator';
+import { TransportError } from './transportError';
 
-export const BRIDGE_CHAR = {
-  scheduleSync: 0,
-  scheduleDigest: 1,
-  currentTime: 2,
-  newAlert: 3,
-  battery: 4,
-  eventRead: 5,
-  prayerSettings: 6,
-  beaconKey: 7,
-  beaconControl: 8,
-  multiAlarm: 9,
-  // OTA update surface (Phase 1+). DFU uses the Nordic-legacy service 0x1530;
-  // fsTransfer is the Adafruit BLE filesystem (0xFEBB); firmwareRevision is the
-  // standard Device Information Service firmware string (0x2A26).
-  dfuControl: 10, // 0x1531 write + notify
-  dfuPacket: 11, // 0x1532 write-without-response
-  fsTransfer: 12, // adaf0200 write + notify
-  firmwareRevision: 13, // 0x2A26 read
-  weather: 14, // 00050001 write (SimpleWeatherService: current + forecast)
-  steps: 15, // 00030001 read (MotionService: today's cumulative step count)
-  stepsYesterday: 16, // 00030003 read (MotionService: yesterday's total)
-  // 17..29 are MusicService/call-event chars, addressed only from the native
-  // Kotlin module (WatchChar) and Node e2e scripts, so they're not in this map.
-  tasksSync: 30, // 000a0001 write (TaskService: begin/record/commit/abort/setStreak)
-  tasksDigest: 31, // 000a0002 read (protoVer, capacity, count, version, streak)
-  taskRead: 32, // 000a0003 write index -> read one task record
-} as const;
+export { BRIDGE_CHAR };
+export type { BridgeCharId };
 
-export type BridgeCharId = (typeof BRIDGE_CHAR)[keyof typeof BRIDGE_CHAR];
+// The structured error every transport throws. Defined in transportError.ts
+// (with the pure BLE classifier) and re-exported here so the many `from
+// './transport'` imports keep working.
+export { TransportError };
+export type { TransportErrorKind, TransportErrorMetadata } from './transportError';
+export { classifyBleError, isRetryableKind } from './transportError';
 
 export interface WatchTransport {
   /** deviceId: BLE MAC for real watches; "host:port" for the sim bridge. */
@@ -88,19 +72,6 @@ export async function restoreConnectionPriority(transport: WatchTransport): Prom
   }
 }
 
-export class TransportError extends Error {
-  constructor(message: string, readonly cause?: unknown) {
-    super(message);
-    this.name = 'TransportError';
-  }
-}
-
-/**
- * Run `fn` over one open connection, always disconnecting afterwards. Every
- * watch operation is a connect → do work → disconnect cycle (the BLE link is
- * exclusive), so this is the single place that owns that lifecycle.
- * `mtu` is requested when given; the caller checks the negotiated value.
- */
 /**
  * Enough for every message the app sends. Negotiated by default because the
  * ATT default of 23 leaves a 20-byte payload, which silently truncates the
@@ -111,14 +82,24 @@ export class TransportError extends Error {
  */
 export const DEFAULT_MTU = 256;
 
+/**
+ * Run `fn` over one coordinated open connection, always disconnecting
+ * afterwards. Every ordinary watch operation is a connect → do work →
+ * disconnect cycle (the BLE link is exclusive), and it must also pause the
+ * native notification-forwarding link to the same watch first and resume it
+ * after. That whole envelope — pause, connect-with-retry, disconnect, resume —
+ * is owned by the app-wide ConnectionCoordinator; this helper adds the
+ * per-connection MTU negotiation and clock set that every ordinary op wants,
+ * then runs `fn`. `mtu` is requested when given; the caller checks the
+ * negotiated value.
+ */
 export async function withConnection<T>(
   transport: WatchTransport,
   deviceId: string,
   fn: () => Promise<T>,
   mtu: number = DEFAULT_MTU,
 ): Promise<T> {
-  await transport.connect(deviceId);
-  try {
+  return getCoordinator().run(transport, deviceId, async () => {
     // Best-effort: a watch that refuses still handles the short writes, so
     // don't fail the whole operation over it.
     await transport.requestMtu(mtu).catch(() => undefined);
@@ -138,7 +119,5 @@ export async function withConnection<T>(
       console.warn('could not set the watch clock:', (e as Error)?.message ?? e);
     });
     return await fn();
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }

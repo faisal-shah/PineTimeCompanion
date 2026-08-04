@@ -8,8 +8,13 @@ import { DarkTheme } from '@react-navigation/native';
 import { loadWatches, saveWatches, WatchStore } from '../storage/store';
 import { migrateSecrets } from '../secure/secrets';
 import { syncForwarderConfig } from '../notifications/forwarder';
+import { installForwardingGate } from '../notifications/forwardingGate';
 import { Watch } from '../model/types';
 import { colors } from '../ui/theme';
+
+// Make the app-wide ConnectionCoordinator pause/resume the native forwarding
+// link around every JS-driven op. No-op on web (forwarder shadow is inert).
+installForwardingGate();
 
 export const navTheme = {
   ...DarkTheme,

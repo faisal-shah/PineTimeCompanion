@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeEvent } from './types';
+import { describeEvent, managementFromStatus } from './types';
 
 test('the rule line names the end date when there is one', () => {
   const daily = { rule: { kind: 'everyNDays' as const, intervalDays: 1 } };
@@ -23,4 +23,18 @@ test('the year is shown when the end date is not this year', () => {
   assert.match(describeEvent({ ...weekly, endDate: '2099-06-30' }, now), /2099/);
   // ...and omitted when it is this year, where it would just be noise.
   assert.doesNotMatch(describeEvent({ ...weekly, endDate: '2026-06-30' }, now), /2026/);
+});
+
+test('managementFromStatus copies the diagnostic fields', () => {
+  const status = { protocolVersion: 1, capacity: 5, resetEpoch: 42, evictionCount: 3 };
+  const meta = managementFromStatus(status, { verified: false });
+  assert.deepEqual(meta, { protocolVersion: 1, capacity: 5, resetEpoch: 42, evictionCount: 3 });
+  assert.equal(meta.verifiedAt, undefined);
+});
+
+test('managementFromStatus stamps verifiedAt only when verified', () => {
+  const status = { protocolVersion: 1, capacity: 5, resetEpoch: 42, evictionCount: 3 };
+  const now = new Date('2026-01-02T03:04:05.000Z');
+  const meta = managementFromStatus(status, { verified: true, now });
+  assert.equal(meta.verifiedAt, '2026-01-02T03:04:05.000Z');
 });

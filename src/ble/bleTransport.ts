@@ -6,6 +6,7 @@
 import { BleManager, ConnectionPriority, Device } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import { BridgeCharId, TransportError, WatchTransport } from './transport';
+import { connectAndDiscover } from './bleConnect';
 import { CHAR_MAP } from './gattUuids';
 
 export class BleTransport implements WatchTransport {
@@ -14,12 +15,12 @@ export class BleTransport implements WatchTransport {
   constructor(private readonly manager: BleManager) {}
 
   async connect(deviceId: string): Promise<void> {
-    try {
-      const device = await this.manager.connectToDevice(deviceId, { timeout: 15000 });
-      this.device = await device.discoverAllServicesAndCharacteristics();
-    } catch (e) {
-      throw new TransportError(`BLE connect failed: ${(e as Error).message}`, e);
-    }
+    // The connect+discover+cleanup contract lives in connectAndDiscover: it
+    // stores the connected device before discovery and cancels a half-open link
+    // on any failure, so `this.device` is only ever set to a fully usable link
+    // and a partial connect never leaks an un-releasable connection.
+    this.device = undefined;
+    this.device = await connectAndDiscover(this.manager, deviceId);
   }
 
   async requestMtu(mtu: number): Promise<number> {

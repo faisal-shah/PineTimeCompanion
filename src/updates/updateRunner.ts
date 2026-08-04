@@ -1,15 +1,26 @@
 // Orchestrates an OTA update over a WatchTransport: read the running firmware
 // revision, flash a firmware DFU archive, and push an external-resources
-// archive. Each step owns the connection (connect -> work -> disconnect) so the
-// UI can run them independently and the watch's exclusive GATT link is released
-// between steps.
+// archive. Each step is one coordinated transient session (connect -> work ->
+// disconnect) so the UI can run them independently and the watch's exclusive
+// GATT link — and the notification-forwarding link to the same watch — is
+// released between steps.
+//
+// The forwarding pause/resume and the bounded connect retry are NOT open-coded
+// here: they belong to the app-wide ConnectionCoordinator, the single authority
+// for that envelope. Routing through it is what keeps OTA from double-pausing
+// the forwarder (which the old open-coded pause/resume did) and gives DFU the
+// same transient-failure retry as everything else. The DFU/FS steps
+// deliberately do not go through withConnection (no clock write on the DFU
+// path) so they never race a rebooting watch — they use the coordinator's
+// run() directly.
 
 import { WatchTransport, BRIDGE_CHAR } from '../ble/transport';
+import { getCoordinator } from '../ble/connectionCoordinator';
+import { classifyBleError } from '../ble/transportError';
 import { runDfu, DfuProgress } from '../ble/legacyDfu';
 import { parseDfuArchive } from '../ble/dfuZip';
 import { uploadResources, ResourcesProgress } from '../ble/resourcesUpload';
 import { parseResourcesArchive } from '../ble/resourcesZip';
-import { pauseConnections, resumeConnections } from '../notifications/forwarder';
 
 // The watch refused DFU/FS access: "Firmware & files" is Disabled in its
 // settings (BLE_ATT_ERR_INSUFFICIENT_AUTHOR / status 8).
@@ -20,20 +31,20 @@ export class DfuDisabledError extends Error {
   }
 }
 
-function isAuthError(e: unknown): boolean {
-  const m = (e as Error)?.message ?? '';
-  return /\bstatus 8\b/.test(m) || /authoriz/i.test(m) || /insufficient_auth/i.test(m);
+function asDfuError(e: unknown): unknown {
+  // Classify in DFU/FS context: insufficient *authorization* (ATT status 8)
+  // here means the watch's "Firmware & files" access is Disabled, so surface
+  // the actionable message instead of a raw GATT error. In any other context
+  // the same status 8 is a generic `authorization` refusal.
+  return classifyBleError(e, 'dfu').kind === 'dfuDisabled' ? new DfuDisabledError() : e;
 }
 
 /** Read the Device Information Service firmware revision string (e.g. "1.16.0"). */
 export async function readFirmwareRevision(transport: WatchTransport, deviceId: string): Promise<string> {
-  await transport.connect(deviceId);
-  try {
+  return getCoordinator().run(transport, deviceId, async () => {
     const bytes = await transport.read(BRIDGE_CHAR.firmwareRevision);
     return new TextDecoder().decode(bytes).replace(/\0+$/, '').trim();
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-  }
+  });
 }
 
 /**
@@ -48,16 +59,12 @@ export async function runFirmwareUpdate(
   onProgress?: (p: DfuProgress) => void,
 ): Promise<void> {
   const archive = parseDfuArchive(dfuZip);
-  // DFU needs exclusive access; release any forwarding link to this watch first.
-  await pauseConnections(deviceId).catch(() => undefined);
-  await transport.connect(deviceId);
   try {
-    await runDfu(transport, archive, onProgress);
+    await getCoordinator().run(transport, deviceId, async () => {
+      await runDfu(transport, archive, onProgress);
+    });
   } catch (e) {
-    throw isAuthError(e) ? new DfuDisabledError() : e;
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-    await resumeConnections(deviceId).catch(() => undefined);
+    throw asDfuError(e);
   }
 }
 
@@ -69,17 +76,14 @@ export async function runResourcesUpdate(
   onProgress?: (p: ResourcesProgress) => void,
 ): Promise<void> {
   const archive = parseResourcesArchive(resourcesZip);
-  await pauseConnections(deviceId).catch(() => undefined);
-  await transport.connect(deviceId);
   try {
-    // A larger MTU lets the 235-byte FS chunks go out in one write on real
-    // hardware; the sim bridge ignores it. DFU is unaffected (always 20-byte).
-    await transport.requestMtu(256).catch(() => undefined);
-    await uploadResources(transport, archive, onProgress);
+    await getCoordinator().run(transport, deviceId, async () => {
+      // A larger MTU lets the 235-byte FS chunks go out in one write on real
+      // hardware; the sim bridge ignores it. DFU is unaffected (always 20-byte).
+      await transport.requestMtu(256).catch(() => undefined);
+      await uploadResources(transport, archive, onProgress);
+    });
   } catch (e) {
-    throw isAuthError(e) ? new DfuDisabledError() : e;
-  } finally {
-    await transport.disconnect().catch(() => undefined);
-    await resumeConnections(deviceId).catch(() => undefined);
+    throw asDfuError(e);
   }
 }

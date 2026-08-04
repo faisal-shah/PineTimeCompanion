@@ -21,7 +21,7 @@ object ConnectionManager {
   private const val TAG = "NotifyFwd/ConnMgr"
 
   private val connections = ConcurrentHashMap<String, WatchConnection>()
-  private val paused = ConcurrentHashMap.newKeySet<String>()
+  private val pauseCounter = PauseCounter()
   @Volatile private var appContext: Context? = null
   @Volatile private var lastConfig = ForwarderConfig()
   @Volatile private var receiverRegistered = false
@@ -74,7 +74,7 @@ object ConnectionManager {
     }
     // Start newly wanted (unless paused for a JS-driven op).
     for ((id, watch) in desired) {
-      if (id in paused) continue
+      if (pauseCounter.isPaused(id)) continue
       if (connections[id] == null) {
         val conn = createConnection(id)
         connections[id] = conn
@@ -91,18 +91,29 @@ object ConnectionManager {
   fun hasEnabledWatches(): Boolean = lastConfig.enabledWatches.isNotEmpty()
 
   /** Pause a watch's forwarding link so JS-driven BLE ops (sync, DFU) get
-   *  exclusive access; resume re-establishes it from the last config. */
+   *  exclusive access; resume re-establishes it from the last config.
+   *
+   *  Reference-counted per device: overlapping ops on the same watch tear the
+   *  link down once (on the first pause) and rebuild it once (on the last
+   *  resume). A nested pause does not resume early, and a stray resume neither
+   *  underflows the count nor unexpectedly starts a connection. */
   @Synchronized
   fun pause(deviceId: String) {
-    paused.add(deviceId)
-    connections.remove(deviceId)?.stop()
+    if (pauseCounter.acquire(deviceId)) {
+      connections.remove(deviceId)?.stop()
+    }
   }
 
   @Synchronized
   fun resume(deviceId: String) {
-    paused.remove(deviceId)
-    applyConfig(lastConfig)
+    if (pauseCounter.release(deviceId)) {
+      applyConfig(lastConfig)
+    }
   }
+
+  /** Watches whose forwarding is currently paused by a running JS-driven op.
+   *  Surfaced through the module's status so the UI can show ownership. */
+  fun pausedDeviceIds(): List<String> = pauseCounter.pausedDevices().toList()
 
   fun status(): List<Pair<String, ConnState>> =
     connections.map { it.key to it.value.state() }

@@ -71,6 +71,27 @@ export interface WatchTask extends ListItem {
   order: number;
 }
 
+/**
+ * What the app last learned from the watch's companion-management service
+ * (companionStatus / companionVerify). Persisted so a later authentication
+ * failure can be diagnosed — a bumped resetEpoch means the watch forgot all its
+ * pairings, an advanced evictionCount means this phone may have been the
+ * least-recently-used companion the watch dropped to make room for a new one.
+ * Absent on watches paired by older firmware (or before this data existed).
+ */
+export interface CompanionManagement {
+  /** Management protocol version last seen on the watch. */
+  protocolVersion: number;
+  /** Retained-peer capacity the firmware reported (five today). */
+  capacity: number;
+  /** Watch reset epoch at the last successful read; a change means it cleared pairings. */
+  resetEpoch: number;
+  /** LRU eviction count at the last successful read; an increase means it forgot a companion. */
+  evictionCount: number;
+  /** ISO timestamp of the last authenticated verify that proved the bond. */
+  verifiedAt?: string;
+}
+
 /** Per-watch FindMy beacon config. Only advertisementKeyB64 goes to the watch. */
 export interface BeaconConfig {
   /**
@@ -99,6 +120,8 @@ export interface Watch {
   beacon?: BeaconConfig;
   /** Forward phone notifications to this watch (Android only, persistent link). */
   forwardNotifications?: boolean;
+  /** Last-seen companion-management state; drives repair diagnostics. Absent on legacy pairings. */
+  management?: CompanionManagement;
 
   /** recurring reminders — watch-authoritative synced list */
   schedule: SyncedList<WatchEvent>;
@@ -108,8 +131,29 @@ export interface Watch {
   taskStreak?: number;
 }
 
-export const RULE_KIND_CODES: Record<RuleKind, number> = {
-  once: 0,
+/**
+ * Build the persisted management metadata from a freshly-read companion status.
+ * Structural argument (not the decoder type) so the model layer stays free of
+ * BLE imports. `verifiedAt` is set only when the read was the authenticated
+ * verify that proved the bond.
+ */
+export function managementFromStatus(
+  status: { protocolVersion: number; capacity: number; resetEpoch: number; evictionCount: number },
+  opts: { verified: boolean; now?: Date } = { verified: false },
+): CompanionManagement {
+  const meta: CompanionManagement = {
+    protocolVersion: status.protocolVersion,
+    capacity: status.capacity,
+    resetEpoch: status.resetEpoch,
+    evictionCount: status.evictionCount,
+  };
+  if (opts.verified) {
+    meta.verifiedAt = (opts.now ?? new Date()).toISOString();
+  }
+  return meta;
+}
+
+export const RULE_KIND_CODES: Record<RuleKind, number> = {  once: 0,
   everyNDays: 1,
   weekly: 2,
   monthly: 3,

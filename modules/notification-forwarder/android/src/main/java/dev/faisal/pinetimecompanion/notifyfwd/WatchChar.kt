@@ -10,33 +10,31 @@ import java.util.UUID
 enum class WatchChar(val simCharId: Int, val gattUuid: UUID) {
   // Current Time Service. Needs no pairing, which is what lets the forwarder
   // set the clock on a watch that has never been bonded to this phone.
-  CURRENT_TIME(2, uuid("00002a2b-0000-1000-8000-00805f9b34fb")),
+  CURRENT_TIME(GeneratedCompanionProtocol.CURRENT_TIME_BRIDGE_ID, GeneratedCompanionProtocol.CURRENT_TIME_UUID),
 
   // Alert Notification Service.
-  NEW_ALERT(3, uuid("00002a46-0000-1000-8000-00805f9b34fb")),
-  CALL_EVENT(29, uuid("00020001-78fc-48fe-8e23-433b3a1942d0")), // notify
+  NEW_ALERT(GeneratedCompanionProtocol.NEW_ALERT_BRIDGE_ID, GeneratedCompanionProtocol.NEW_ALERT_UUID),
+  CALL_EVENT(GeneratedCompanionProtocol.CALL_EVENT_BRIDGE_ID, GeneratedCompanionProtocol.CALL_EVENT_UUID), // notify
 
   // MusicService (service 00000000-78fc-...).
-  MUSIC_EVENT(28, uuid("00000001-78fc-48fe-8e23-433b3a1942d0")), // notify
-  MUSIC_STATUS(17, uuid("00000002-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_ARTIST(18, uuid("00000003-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_TRACK(19, uuid("00000004-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_ALBUM(20, uuid("00000005-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_POSITION(21, uuid("00000006-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_TOTAL_LENGTH(22, uuid("00000007-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_TRACK_NUMBER(23, uuid("00000008-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_TRACK_TOTAL(24, uuid("00000009-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_PLAYBACK_SPEED(25, uuid("0000000a-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_REPEAT(26, uuid("0000000b-78fc-48fe-8e23-433b3a1942d0")),
-  MUSIC_SHUFFLE(27, uuid("0000000c-78fc-48fe-8e23-433b3a1942d0"));
+  MUSIC_EVENT(GeneratedCompanionProtocol.MUSIC_EVENT_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_EVENT_UUID), // notify
+  MUSIC_STATUS(GeneratedCompanionProtocol.MUSIC_STATUS_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_STATUS_UUID),
+  MUSIC_ARTIST(GeneratedCompanionProtocol.MUSIC_ARTIST_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_ARTIST_UUID),
+  MUSIC_TRACK(GeneratedCompanionProtocol.MUSIC_TRACK_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_TRACK_UUID),
+  MUSIC_ALBUM(GeneratedCompanionProtocol.MUSIC_ALBUM_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_ALBUM_UUID),
+  MUSIC_POSITION(GeneratedCompanionProtocol.MUSIC_POSITION_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_POSITION_UUID),
+  MUSIC_TOTAL_LENGTH(GeneratedCompanionProtocol.MUSIC_TOTAL_LENGTH_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_TOTAL_LENGTH_UUID),
+  MUSIC_TRACK_NUMBER(GeneratedCompanionProtocol.MUSIC_TRACK_NUMBER_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_TRACK_NUMBER_UUID),
+  MUSIC_TRACK_TOTAL(GeneratedCompanionProtocol.MUSIC_TRACK_TOTAL_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_TRACK_TOTAL_UUID),
+  MUSIC_PLAYBACK_SPEED(GeneratedCompanionProtocol.MUSIC_PLAYBACK_SPEED_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_PLAYBACK_SPEED_UUID),
+  MUSIC_REPEAT(GeneratedCompanionProtocol.MUSIC_REPEAT_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_REPEAT_UUID),
+  MUSIC_SHUFFLE(GeneratedCompanionProtocol.MUSIC_SHUFFLE_BRIDGE_ID, GeneratedCompanionProtocol.MUSIC_SHUFFLE_UUID);
 
   companion object {
-    val ANS_SERVICE: UUID = uuid("00001811-0000-1000-8000-00805f9b34fb")
-    val CTS_SERVICE: UUID = uuid("00001805-0000-1000-8000-00805f9b34fb")
-    val MUSIC_SERVICE: UUID = uuid("00000000-78fc-48fe-8e23-433b3a1942d0")
+    val ANS_SERVICE: UUID = GeneratedCompanionProtocol.NEW_ALERT_SERVICE_UUID
+    val CTS_SERVICE: UUID = GeneratedCompanionProtocol.CURRENT_TIME_SERVICE_UUID
+    val MUSIC_SERVICE: UUID = GeneratedCompanionProtocol.MUSIC_EVENT_SERVICE_UUID
 
     fun bySimCharId(id: Int): WatchChar? = entries.firstOrNull { it.simCharId == id }
   }
 }
-
-private fun uuid(s: String): UUID = UUID.fromString(s)

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      infinitime_ref:
+        description: InfiniTime branch, tag, or full SHA providing the generated contract
+        required: true
+        default: family-features
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  INFINITIME_REF: ${{ inputs.infinitime_ref || 'family-features' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: family/PineTimeCompanion
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/InfiniTime
+          ref: ${{ env.INFINITIME_REF }}
+          path: family/InfiniTime
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: family/PineTimeCompanion/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Record selected revisions
+        run: |
+          {
+            echo "## Selected revisions"
+            echo
+            echo "| Repository | Requested ref | Resolved SHA |"
+            echo "|---|---|---|"
+            echo "| PineTimeCompanion | event SHA | $(git -C family/PineTimeCompanion rev-parse HEAD) |"
+            echo "| InfiniTime | \`$INFINITIME_REF\` | $(git -C family/InfiniTime rev-parse HEAD) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify generated companion contract
+        run: |
+          uv run --script family/InfiniTime/tools/generate_companion_protocol.py \
+            --workspace-root family \
+            --targets companion \
+            --check
+
+      - name: Install dependencies
+        working-directory: family/PineTimeCompanion
+        run: npm ci
+
+      - name: Type-check
+        working-directory: family/PineTimeCompanion
+        run: npm run typecheck
+
+      - name: Run TypeScript tests
+        working-directory: family/PineTimeCompanion
+        run: npm test
+
+      - name: Run pure Kotlin tests
+        working-directory: family/PineTimeCompanion
+        run: npm run test:kotlin
+
+      - name: Export web application
+        working-directory: family/PineTimeCompanion
+        run: npm run web:export

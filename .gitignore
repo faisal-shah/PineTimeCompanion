@@ -56,3 +56,6 @@ modules/**/build/
 
 # Screenshots from verification runs
 shots/
+
+# Isolated-JVM Kotlin test cache (downloaded kotlinc + junit; see scripts/kotlin-pure-tests.sh)
+.kotlin-jvm-test/

@@ -4,11 +4,21 @@
 // guard is needed here.
 
 import type { EventSubscription } from 'expo-modules-core';
-import Native, { type ConnState, type ForwarderStatus, type InstalledApp, type NowPlaying } from '../../modules/notification-forwarder';
+import Native, { type BondState, type ConnState, type ForwarderStatus, type InstalledApp, type NowPlaying } from '../../modules/notification-forwarder';
 import { Watch } from '../model/types';
 import { getNotificationSettings } from '../storage/notificationSettings';
 
 export const forwarderAvailable = true;
+
+// Forwarding ownership (which watch a running op currently holds) lives on the
+// app-wide coordinator; re-export it here as the single import point for a
+// later forwarding-status UI. The native ForwarderStatus.pausedDeviceIds is the
+// service-side view of the same fact.
+export {
+  forwardingOwnership,
+  subscribeForwardingOwnership,
+  type ForwardingHold,
+} from '../ble/connectionCoordinator';
 
 export function isNotificationAccessGranted(): Promise<boolean> {
   return Native.isNotificationAccessGranted();
@@ -21,6 +31,21 @@ export function openNotificationAccessSettings(): void {
 /** App info, where Android 13+ hides "Allow restricted settings". */
 export function openAppInfoSettings(): void {
   Native.openAppInfoSettings();
+}
+
+/** System Bluetooth settings — where the user forgets a watch during repair. */
+export function openBluetoothSettings(): void {
+  Native.openBluetoothSettings();
+}
+
+/** The OS bond state for a device (repair diagnostics). */
+export function getBondState(deviceId: string): Promise<BondState> {
+  return Native.getBondState(deviceId);
+}
+
+/** Ask Android to (re)create a bond via the public pairing dialog. Never removes one. */
+export function createBond(deviceId: string): Promise<boolean> {
+  return Native.createBond(deviceId);
 }
 
 export function getInstalledApps(): Promise<InstalledApp[]> {

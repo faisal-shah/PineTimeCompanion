@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.core.app.NotificationManagerCompat
@@ -99,6 +101,30 @@ class NotificationForwarderModule : Module() {
       context.startActivity(intent)
     }
 
+    // System Bluetooth settings — the honest place to "Forget" a watch. There is
+    // no hidden API to remove a bond ourselves; repair walks the user here.
+    Function("openBluetoothSettings") {
+      val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(intent)
+    }
+
+    // The OS bond state for a device, as a stable string ("NONE"/"BONDING"/
+    // "BONDED"/"UNKNOWN"). A sim "host:port" id or any non-MAC returns UNKNOWN.
+    AsyncFunction("getBondState") { deviceId: String ->
+      bondStateOf(deviceId).name
+    }
+
+    // Ask Android to (re)create a bond with the device. Public API only:
+    // BluetoothDevice.createBond() triggers the normal system pairing dialog.
+    // Returns whether the request was accepted (or the device is already
+    // bonded); pairing completes asynchronously and is observed via
+    // getBondState. Never removes a bond.
+    AsyncFunction("createBond") { deviceId: String ->
+      val device = remoteDeviceOrNull(deviceId) ?: return@AsyncFunction false
+      if (device.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) true else device.createBond()
+    }
+
     AsyncFunction("getInstalledApps") {
       val pm = context.packageManager
       val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
@@ -118,6 +144,8 @@ class NotificationForwarderModule : Module() {
         "connections" to ConnectionManager.status().map {
           mapOf("deviceId" to it.first, "state" to it.second.name)
         },
+        // Watches whose forwarding link is currently held by a JS-driven op.
+        "pausedDeviceIds" to ConnectionManager.pausedDeviceIds(),
         "nowPlaying" to ConnectionManager.musicBridge()?.nowPlaying()?.let {
           mapOf("artist" to it.first, "track" to it.second, "playing" to it.third)
         },
@@ -142,5 +170,17 @@ class NotificationForwarderModule : Module() {
     val pkgs = (config["allowedPackages"] as? List<Any?>).orEmpty().map { it.toString() }.toSet()
     val forwardCalls = config["forwardCalls"] as? Boolean ?: true
     return ForwarderConfig(watches, pkgs, forwardCalls)
+  }
+
+  /** Resolve a MAC to a BluetoothDevice, or null for a sim id / invalid address. */
+  private fun remoteDeviceOrNull(deviceId: String): android.bluetooth.BluetoothDevice? {
+    if (!BluetoothAdapter.checkBluetoothAddress(deviceId)) return null
+    val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter ?: return null
+    return runCatching { adapter.getRemoteDevice(deviceId) }.getOrNull()
+  }
+
+  private fun bondStateOf(deviceId: String): BondState {
+    val device = remoteDeviceOrNull(deviceId) ?: return BondState.UNKNOWN
+    return BondState.fromAndroid(device.bondState)
   }
 }

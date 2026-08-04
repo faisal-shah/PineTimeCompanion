@@ -5,12 +5,13 @@
 // value, the watch's /.system/prayer.dat and this app's canonical form.
 
 import { AsrMadhab, PrayerAlerts, PrayerMethod, PrayerSettings } from '../model/types';
+import { GATT_CHARACTERISTICS, RECORDS } from './generated/companionProtocol';
 
-export const PRAYER_SERVICE_UUID = '00070000-78fc-48fe-8e23-433b3a1942d0';
-export const PRAYER_SETTINGS_CHAR_UUID = '00070001-78fc-48fe-8e23-433b3a1942d0';
+export const PRAYER_SERVICE_UUID = GATT_CHARACTERISTICS.prayerSettings.service;
+export const PRAYER_SETTINGS_CHAR_UUID = GATT_CHARACTERISTICS.prayerSettings.characteristic;
 
-export const PRAYER_SETTINGS_SIZE = 9;
-export const PRAYER_SETTINGS_VERSION = 1;
+export const PRAYER_SETTINGS_SIZE = RECORDS.prayer_settings.record_size;
+export const PRAYER_SETTINGS_VERSION = RECORDS.prayer_settings.protocol_version;
 
 const METHOD_CODES: Record<PrayerMethod, number> = { mwl: 0, isna: 1, egyptian: 2, ummAlQura: 3, karachi: 4 };
 const METHODS: PrayerMethod[] = ['mwl', 'isna', 'egyptian', 'ummAlQura', 'karachi'];

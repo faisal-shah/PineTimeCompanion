@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { showAlert } from '../ui/alert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { needsSync } from '../model/listSync';
+import { managementFromStatus } from '../model/types';
 import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
 import { CardGrid } from '../ui/CardGrid';
@@ -12,8 +13,14 @@ import { Button } from '../ui/Button';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 import { Dialog, DialogTitle } from '../ui/Dialog';
 import { useWatchOp } from '../ui/useWatchOp';
+import { presentWatchOpError } from '../ui/watchOpError';
+import { confirm } from '../ui/confirm';
+import { WATCH_ACTIVITY_LABEL, useWatchConnectionStatus } from '../ui/useWatchConnectionStatus';
 import { makeTransport } from '../ble/transportFactory';
 import { readBattery, sendMessageToWatch, setWatchTime } from '../ble/syncManager';
+import { readManagementStatus } from '../ble/companionPairing';
+import { RepairAdvice, ON_WATCH_FORGET_ALL, decideRepair } from '../ble/repairAdvice';
+import { openBluetoothSettings } from '../notifications/forwarder';
 import { deleteBeaconPrivateKey } from '../secure/secrets';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchDetail'>;
@@ -33,26 +40,47 @@ const FEATURES: { key: FeatureKey; icon: string; title: string; subtitle: string
   { key: 'Update', icon: '⬆️', title: 'Update watch', subtitle: 'Firmware & resources' },
 ];
 
+// Web/desktop can't drive the OS bond; walk the user through their computer.
+const COMPUTER_REPAIR_STEPS =
+  'On your computer, open Bluetooth settings and remove (forget) “InfiniTime”, then pick it again from the browser’s Bluetooth chooser. On Windows, remove it under Settings > Bluetooth & devices; a stale pairing can also be cleared from the registry under HKLM\\SYSTEM\\CurrentControlSet\\Services\\BTHPORT\\Parameters\\Keys.';
+
 export function WatchDetailScreen({ navigation, route }: Props) {
   const { watches, upsertWatch, removeWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
   const op = useWatchOp(watch);
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeText, setComposeText] = useState('');
+  const [repairing, setRepairing] = useState(false);
+  const [repairAdvice, setRepairAdvice] = useState<RepairAdvice | null>(null);
   const keyboardHeight = useKeyboardHeight();
+  const activity = useWatchConnectionStatus(watch?.deviceId, op.busy !== null || repairing);
 
   if (!watch) {
     return null;
   }
 
+  // An op running from this screen: on an authentication failure, open the
+  // repair flow (which reads the watch's public status) instead of a dead-end
+  // alert; everything else goes through the shared presenter.
+  const onOpError = (label: string) => (e: unknown) => {
+    const view = presentWatchOpError(e, { label });
+    if (view.action === 'pairRepair') {
+      void repairPairing();
+      return;
+    }
+    showAlert(view.title, view.message);
+  };
+
+  const runOp = (label: string, fn: (deviceId: string) => Promise<void>) => op.run(label, fn, onOpError(label));
+
   const doSetTime = () =>
-    op.run('Set time', async (deviceId) => {
+    runOp('Set time', async (deviceId) => {
       await setWatchTime(makeTransport(deviceId), deviceId);
       showAlert('Time set', 'Watch clock updated.');
     });
 
   const doBattery = () =>
-    op.run('Battery', async (deviceId) => {
+    runOp('Battery', async (deviceId) => {
       const percent = await readBattery(makeTransport(deviceId), deviceId);
       upsertWatch({ ...watch, batteryPercent: percent });
     });
@@ -72,20 +100,70 @@ export function WatchDetailScreen({ navigation, route }: Props) {
       return;
     }
     setComposeOpen(false);
-    void op.run('Message', async (deviceId) => {
+    void runOp('Message', async (deviceId) => {
       await sendMessageToWatch(makeTransport(deviceId), deviceId, 'Message', text);
       showAlert('Sent', `On its way to ${watch.name}'s watch.`);
     });
   };
 
+  // Read the watch's public companion status, diagnose why the bond broke, and
+  // record the fresh read. Computes the advice from the STORED metadata before
+  // overwriting it, so a bumped reset epoch / advanced eviction is still seen.
+  const repairPairing = async () => {
+    if (!watch.deviceId || repairing || op.busy !== null) {
+      return;
+    }
+    setRepairing(true);
+    try {
+      const res = await readManagementStatus(makeTransport(watch.deviceId), watch.deviceId, 'status');
+      let current: { resetEpoch: number; evictionCount: number } | undefined;
+      if (res.kind === 'ok') {
+        current = { resetEpoch: res.status.resetEpoch, evictionCount: res.status.evictionCount };
+      } else if (res.kind === 'error') {
+        const view = presentWatchOpError(res.error, { label: 'Repair' });
+        // A radio/permission problem is not a pairing problem: say so and stop.
+        if (view.kind === 'bluetoothOff' || view.kind === 'permission') {
+          showAlert(view.title, view.message);
+          return;
+        }
+      }
+      const advice = decideRepair(
+        { resetEpoch: watch.management?.resetEpoch, evictionCount: watch.management?.evictionCount },
+        current,
+      );
+      if (res.kind === 'ok') {
+        // Persist the fresh public read; keep the last verified timestamp.
+        upsertWatch({
+          ...watch,
+          management: { ...managementFromStatus(res.status, { verified: false }), verifiedAt: watch.management?.verifiedAt },
+        });
+      }
+      setRepairAdvice(advice);
+    } catch (e) {
+      const view = presentWatchOpError(e, { label: 'Repair' });
+      showAlert(view.title, view.message);
+    } finally {
+      setRepairing(false);
+    }
+  };
+
+  const escalateToWatch = async () => {
+    setRepairAdvice(null);
+    await confirm({ title: ON_WATCH_FORGET_ALL.title, message: ON_WATCH_FORGET_ALL.message, confirmLabel: 'Got it' });
+  };
+
   const paired = !!watch.deviceId;
   const lastSync = watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleDateString() : null;
 
-  const unpair = () => {
-    showAlert('Unpair this watch?', `${watch.name} will be forgotten as a connection. The watch itself keeps its data; you can pair again anytime.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Unpair', style: 'destructive', onPress: () => upsertWatch({ ...watch, deviceId: undefined }) },
-    ]);
+  const removeFromApp = () => {
+    showAlert(
+      'Remove from app?',
+      `${watch.name} stays paired to your phone at the system level, but this app will stop connecting to it. Its schedule, tasks and keys on this phone are kept. Use “Repair pairing” or “Pair” to reconnect.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove from app', style: 'destructive', onPress: () => upsertWatch({ ...watch, deviceId: undefined }) },
+      ],
+    );
   };
 
   const deleteWatch = () => {
@@ -120,6 +198,8 @@ export function WatchDetailScreen({ navigation, route }: Props) {
     return fallback;
   };
 
+  const actionsDisabled = op.busy !== null || repairing;
+
   return (
     <>
       <Dialog visible={composeOpen} onDismiss={() => setComposeOpen(false)}>
@@ -152,19 +232,55 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         </View>
       </Dialog>
 
+      <Dialog visible={repairAdvice !== null} onDismiss={() => setRepairAdvice(null)}>
+        <DialogTitle>{repairAdvice?.title ?? ''}</DialogTitle>
+        <Text style={styles.repairBody}>{repairAdvice?.message ?? ''}</Text>
+        {Platform.OS === 'web' && <Text style={styles.repairBody}>{COMPUTER_REPAIR_STEPS}</Text>}
+        <View style={styles.repairButtons}>
+          {Platform.OS !== 'web' && (
+            <Pressable
+              style={styles.repairPrimary}
+              onPress={openBluetoothSettings}
+              testID="repair-open-bt">
+              <Text style={styles.repairPrimaryText}>Open Bluetooth settings</Text>
+            </Pressable>
+          )}
+          <Pressable
+            style={styles.repairPrimary}
+            onPress={() => {
+              setRepairAdvice(null);
+              navigation.navigate('WatchPair', { watchId: watch.id });
+            }}
+            testID="repair-pair-again">
+            <Text style={styles.repairPrimaryText}>Pair again</Text>
+          </Pressable>
+        </View>
+        <Pressable onPress={escalateToWatch} testID="repair-escalate">
+          <Text style={styles.repairEscalate}>Still not pairing? Forget all on the watch…</Text>
+        </Pressable>
+        <Pressable onPress={() => setRepairAdvice(null)} style={styles.repairClose}>
+          <Text style={styles.repairCloseText}>Close</Text>
+        </Pressable>
+      </Dialog>
+
       <Screen width="list">
         {/* Status strip */}
         <View style={styles.status}>
           <View style={styles.statusLeft}>
             <View style={[styles.dot, { backgroundColor: paired ? colors.accent : colors.textDim }]} />
             <Text style={styles.statusText}>{paired ? 'Paired' : 'Not paired'}</Text>
+            {paired && (
+              <Text style={styles.activityText} testID="watch-activity">
+                · {WATCH_ACTIVITY_LABEL[activity]}
+              </Text>
+            )}
           </View>
           <View style={styles.statusRight}>
             {watch.batteryPercent !== undefined && <Text style={styles.statusMeta}>{watch.batteryPercent}%</Text>}
             {lastSync && <Text style={styles.statusMeta}>synced {lastSync}</Text>}
             {paired && (
-              <Pressable onPress={unpair} testID="unpair">
-                <Text style={styles.unpairText}>Unpair</Text>
+              <Pressable onPress={removeFromApp} testID="remove-from-app">
+                <Text style={styles.removeText}>Remove from app</Text>
               </Pressable>
             )}
           </View>
@@ -197,14 +313,27 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         {/* Watch actions */}
         <Text style={styles.sectionLabel}>Watch</Text>
         <View style={styles.actions}>
-          <ActionButton
-            icon="🔗"
-            label={paired ? 'Re-pair' : 'Pair'}
-            onPress={() => navigation.navigate('WatchPair', { watchId: watch.id })}
-          />
-          <ActionButton icon="🕑" label="Set time" onPress={doSetTime} disabled={op.busy !== null} busy={op.busy === 'Set time'} />
-          <ActionButton icon="🔋" label="Battery" onPress={doBattery} disabled={op.busy !== null} busy={op.busy === 'Battery'} />
-          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={op.busy !== null} busy={op.busy === 'Message'} />
+          {paired ? (
+            <ActionButton
+              icon="🔧"
+              label="Repair pairing"
+              onPress={repairPairing}
+              disabled={actionsDisabled}
+              busy={repairing}
+              testID="repair-pairing"
+            />
+          ) : (
+            <ActionButton
+              icon="🔗"
+              label="Pair"
+              onPress={() => navigation.navigate('WatchPair', { watchId: watch.id })}
+              disabled={actionsDisabled}
+              testID="pair"
+            />
+          )}
+          <ActionButton icon="🕑" label="Set time" onPress={doSetTime} disabled={actionsDisabled} busy={op.busy === 'Set time'} />
+          <ActionButton icon="🔋" label="Battery" onPress={doBattery} disabled={actionsDisabled} busy={op.busy === 'Battery'} />
+          <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={actionsDisabled} busy={op.busy === 'Message'} />
         </View>
 
         <View style={styles.deleteWrap}>
@@ -221,15 +350,17 @@ function ActionButton({
   onPress,
   disabled,
   busy,
+  testID,
 }: {
   icon: string;
   label: string;
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  testID?: string;
 }) {
   return (
-    <Pressable style={[styles.action, disabled === true && { opacity: 0.5 }]} onPress={onPress} disabled={disabled}>
+    <Pressable style={[styles.action, disabled === true && { opacity: 0.5 }]} onPress={onPress} disabled={disabled} testID={testID}>
       {busy === true ? <ActivityIndicator color={colors.accent} style={styles.actionSpinner} /> : <Text style={styles.actionIcon}>{icon}</Text>}
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
@@ -241,9 +372,10 @@ const styles = StyleSheet.create({
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing(1) },
   dot: { width: 10, height: 10, borderRadius: 5 },
   statusText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  activityText: { color: colors.textDim, fontSize: 13 },
   statusRight: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5) },
   statusMeta: { color: colors.textDim, fontSize: 13 },
-  unpairText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  removeText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
 
   featureRow: {
     flexDirection: 'row',
@@ -284,6 +416,14 @@ const styles = StyleSheet.create({
 
   pending: { color: colors.warn, fontSize: 12, marginRight: spacing(1) },
   deleteWrap: { marginTop: spacing(4) },
+
+  repairBody: { color: colors.text, fontSize: 14, lineHeight: 20, marginTop: spacing(1.5) },
+  repairButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1), marginTop: spacing(2) },
+  repairPrimary: { flexGrow: 1, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing(1.5), alignItems: 'center' },
+  repairPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  repairEscalate: { color: colors.warn, fontSize: 13, marginTop: spacing(2) },
+  repairClose: { alignSelf: 'flex-end', marginTop: spacing(1), paddingVertical: spacing(1), paddingHorizontal: spacing(1) },
+  repairCloseText: { color: colors.textDim, fontSize: 15, fontWeight: '600' },
 
   composeInput: {
     backgroundColor: colors.background,
