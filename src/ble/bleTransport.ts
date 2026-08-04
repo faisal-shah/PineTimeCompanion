@@ -3,7 +3,7 @@
 // logic — because this is the one file that cannot run without a physical
 // watch. Everything above the WatchTransport seam is emulator-tested.
 
-import { BleManager, Device } from 'react-native-ble-plx';
+import { BleManager, ConnectionPriority, Device } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import { BridgeCharId, TransportError, WatchTransport } from './transport';
 import { CHAR_MAP } from './gattUuids';
@@ -28,6 +28,22 @@ export class BleTransport implements WatchTransport {
     }
     const device = await this.device.requestMTU(mtu);
     return device.mtu;
+  }
+
+  async requestConnectionPriority(priority: 'high' | 'balanced'): Promise<void> {
+    if (!this.device) {
+      throw new TransportError('not connected');
+    }
+    // Best effort: a refusal costs throughput, never correctness, and must not
+    // turn a working update into a failed one. No-op on iOS, which does not
+    // expose the control.
+    try {
+      await this.device.requestConnectionPriority(
+        priority === 'high' ? ConnectionPriority.High : ConnectionPriority.Balanced,
+      );
+    } catch (e) {
+      console.warn(`connection priority "${priority}" refused: ${(e as Error).message}`);
+    }
   }
 
   async write(charId: BridgeCharId, data: Uint8Array): Promise<void> {

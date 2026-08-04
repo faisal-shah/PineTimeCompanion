@@ -55,6 +55,7 @@ jobs:
           echo "APP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
           echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "GIT_COMMIT_DATE=$(git log -1 --format=%cd --date=short)" >> "$GITHUB_ENV"
       - name: Generate android project
         run: npx expo prebuild --platform android --no-install
       - name: Build release APKs
@@ -101,6 +102,7 @@ jobs:
           echo "APP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
           echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           echo "GIT_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "GIT_COMMIT_DATE=$(git log -1 --format=%cd --date=short)" >> "$GITHUB_ENV"
       - name: Export web bundle
         shell: bash
         run: npx expo export --platform web --output-dir desktop/dist
@@ -165,6 +167,7 @@ jobs:
           export APP_VERSION="${TAG#v}"
           export GIT_COMMIT=$(git rev-parse --short HEAD)
           export GIT_TAG="$TAG"
+          export GIT_COMMIT_DATE=$(git log -1 --format=%cd --date=short)
           export WEB_BASE_URL=/PineTimeCompanion
           npx expo export --platform web --output-dir pages-dist
       - uses: actions/upload-pages-artifact@v3

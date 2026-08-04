@@ -12,6 +12,8 @@ import { DfuArchive } from './dfuZip';
 class MockDfuWatch implements WatchTransport {
   readonly ctrlWrites: Uint8Array[] = [];
   readonly packets: Uint8Array[] = [];
+  /** Connection-priority requests, in order, to prove the link is handed back. */
+  readonly priorities: string[] = [];
   /** Set once the watch has reset out from under the final write. */
   resetRaced = false;
   /** Make this control-point opcode fail, to exercise phase reporting. */
@@ -41,6 +43,10 @@ class MockDfuWatch implements WatchTransport {
     assert.equal(charId, BRIDGE_CHAR.dfuControl, 'DFU subscribes to the control point');
     this.notify = cb;
     return () => (this.notify = undefined);
+  }
+
+  async requestConnectionPriority(priority: 'high' | 'balanced'): Promise<void> {
+    this.priorities.push(priority);
   }
 
   private send(bytes: number[]): void {
@@ -217,4 +223,19 @@ test('runDfu never activates and throws DfuAbortedError when the watch rejects t
   });
   // The image transferred fully, but Activate (0x05) must never be sent.
   assert.ok(!watch.ctrlWrites.some((w) => w[0] === 0x05), 'must not activate a rejected image');
+});
+
+test('the link runs at high priority for the transfer and is handed back after', async () => {
+  const watch = new MockDfuWatch(true);
+  await runDfu(watch, makeArchive(4000));
+  // High must come first: asking after the stream has started leaves the slow
+  // interval in place for exactly the part that matters.
+  assert.deepEqual(watch.priorities, ['high', 'balanced']);
+});
+
+test('the link is handed back even when the update fails', async () => {
+  const watch = new MockDfuWatch(true);
+  watch.failCtrlOp = 0x03;
+  await assert.rejects(runDfu(watch, makeArchive(200)));
+  assert.equal(watch.priorities.at(-1), 'balanced', 'a failed flash must not leave the radio fast');
 });

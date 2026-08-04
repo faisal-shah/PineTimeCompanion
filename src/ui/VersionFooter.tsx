@@ -1,6 +1,11 @@
-// Build identity footer: "v0.7.0 · 97f2253" on stamped release builds,
-// "dev · 97f2253" otherwise. Values are baked at build time by app.config.js
-// (CI exports APP_VERSION/GIT_COMMIT/GIT_TAG). Shared by all platforms.
+// Build identity footer: "v0.7.0 · 97f2253 · 2026-08-04" on stamped release
+// builds, "dev · 97f2253 · ..." otherwise. Values are baked at build time by
+// app.config.js (CI exports APP_VERSION/GIT_COMMIT/GIT_TAG/GIT_COMMIT_DATE).
+// Shared by all platforms.
+//
+// The date is here because a stale page is indistinguishable from a current one
+// otherwise: a browser serving a cached bundle looks exactly like a deploy that
+// never happened, and a tag alone does not say when it was cut.
 
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
@@ -9,10 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from './theme';
 
 export function versionLabel(): string {
-  const extra = Constants.expoConfig?.extra as { gitCommit?: string; gitTag?: string } | undefined;
+  const extra = Constants.expoConfig?.extra as
+    | { gitCommit?: string; gitTag?: string; buildDate?: string }
+    | undefined;
   const tag = extra?.gitTag;
   const commit = extra?.gitCommit ?? 'unknown';
-  return `${tag || 'dev'} · ${commit}`;
+  const date = extra?.buildDate;
+  return [tag || 'dev', commit, date].filter(Boolean).join(' · ');
 }
 
 export function VersionFooter() {

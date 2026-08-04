@@ -53,6 +53,23 @@ export interface WatchTransport {
   writeWithoutResponse(charId: BridgeCharId, data: Uint8Array): Promise<void>;
   /** Subscribe to notifications on a char; returns an unsubscribe fn. */
   subscribe(charId: BridgeCharId, cb: (data: Uint8Array) => void): Promise<() => void>;
+
+  /**
+   * Ask for a low-latency link for a bulk transfer, and hand it back after.
+   *
+   * This is the only remaining lever on DFU throughput. The packet size is
+   * pinned at 20 bytes by the firmware (DfuService::DfuImage::Append), packets
+   * already go out without a response, and the receipt round trips are already
+   * gone -- so what is left is the connection interval, which Android sets to
+   * roughly 30-50 ms by default and drops to about 11.25 ms at high priority.
+   * Neither side asks for it otherwise: the firmware never requests connection
+   * parameters, it only logs the peer's.
+   *
+   * Optional because only Android BLE can honour it; the sim transports and
+   * Web Bluetooth have no such control, and a transfer over them is not slow
+   * for this reason.
+   */
+  requestConnectionPriority?(priority: 'high' | 'balanced'): Promise<void>;
 }
 
 export class TransportError extends Error {

@@ -39,6 +39,10 @@ export async function uploadResources(
   onProgress?: (p: ResourcesProgress) => void,
 ): Promise<void> {
   const fs = new FsClient(transport);
+  // Every chunk here waits for the watch's pacing response, so this transfer is
+  // pure round-trip latency -- it gains even more from the fast connection
+  // interval than the firmware stream does, where packets at least pipeline.
+  await transport.requestConnectionPriority?.('high');
   await fs.begin();
   try {
     const totalBytes = archive.files.reduce((n, f) => n + f.data.length, 0);
@@ -84,5 +88,6 @@ export async function uploadResources(
     }
   } finally {
     fs.end();
+    await transport.requestConnectionPriority?.('balanced');
   }
 }

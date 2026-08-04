@@ -97,6 +97,12 @@ export async function runDfu(
     onProgress?.({ phase: p, sent, total });
   };
 
+  // Ask for the fast connection interval before the first byte. See the note on
+  // WatchTransport.requestConnectionPriority: with the packet size fixed at 20
+  // bytes by the firmware and receipts no longer serialising the stream, the
+  // interval is what decides how long a flash takes.
+  await transport.requestConnectionPriority?.('high');
+
   const ctrl = (bytes: number[]) => transport.write(BRIDGE_CHAR.dfuControl, new Uint8Array(bytes));
   const packet = (data: Uint8Array) => transport.writeWithoutResponse(BRIDGE_CHAR.dfuPacket, data);
   // Activate+Reset only. Command (no response), and a transport error here is
@@ -237,5 +243,9 @@ export async function runDfu(
     throw new Error(`Failed while ${PHASE_LABEL[phase]}: ${(e as Error).message}`);
   } finally {
     unsubscribe();
+    // Hand the link back whatever happened. Leaving it at high priority would
+    // keep both radios in a low-latency duty cycle long after the transfer,
+    // which is a battery cost on the watch for no benefit.
+    await transport.requestConnectionPriority?.('balanced');
   }
 }

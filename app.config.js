@@ -18,6 +18,17 @@ function gitShort() {
   }
 }
 
+// The commit's own date, not the moment of the build: rebuilding the same
+// source must not change what the footer says, and "when was this last
+// changed" is the question a reader is actually asking.
+function gitDate() {
+  try {
+    return execSync('git log -1 --format=%cd --date=short', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return '';
+  }
+}
+
 // 0.7.0 -> 700, 1.2.13 -> 10213 (monotonic while minor/patch < 100)
 function versionCode(version) {
   const [maj = 0, min = 0, pat = 0] = version.split('.').map((n) => parseInt(n, 10) || 0);
@@ -37,6 +48,7 @@ module.exports = ({ config }) => {
       ...config.extra,
       gitCommit: process.env.GIT_COMMIT || gitShort(),
       gitTag: process.env.GIT_TAG || '',
+      buildDate: process.env.GIT_COMMIT_DATE || gitDate(),
     },
     experiments: {
       ...config.experiments,
