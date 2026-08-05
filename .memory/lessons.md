@@ -7,6 +7,8 @@
 - The forwarding service owns a persistent link independently of JavaScript.
 - Simulator IDs contain one colon; real BLE MACs contain five.
 - Public management status must be read before the authenticated verify step.
+- The 2.0.0 firmware reset is intentional format initialization, not a
+  compatibility migration.
 
 ## Patterns
 

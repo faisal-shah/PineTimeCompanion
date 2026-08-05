@@ -188,8 +188,10 @@ Two separate actions on WatchDetail:
   repair still fails does it point at the watch's own *Settings > Bluetooth >
   Forget all*, warning that this affects every paired phone.
 
-Note: upgrading to the firmware that introduced companion management resets the
-watch's pairings once. After that one-time reset, pair again as above.
+InfiniTime 2.0.0 intentionally starts with an empty final-format bond store
+instead of importing either older format, including v1.26.0. Every phone and
+computer pairs once after that upgrade; schedules, tasks, alarms, settings, and
+resources remain intact.
 
 ## Updating a watch (OTA)
 
