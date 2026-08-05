@@ -56,6 +56,7 @@ test('decodes the golden vector field by field', () => {
     writePending: true,
     criticalDirty: false,
     usageDirty: true,
+    formatInitializationPending: false,
   });
 });
 
@@ -94,6 +95,7 @@ test('every flag bit decodes to its own field', () => {
     [{ writePending: true }, 'writePending'],
     [{ criticalDirty: true }, 'criticalDirty'],
     [{ usageDirty: true }, 'usageDirty'],
+    [{ formatInitializationPending: true }, 'formatInitializationPending'],
   ];
   for (const [flags, name] of cases) {
     const s = decodeCompanionManagementStatus(

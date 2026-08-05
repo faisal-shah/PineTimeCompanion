@@ -46,7 +46,7 @@ export const MANAGEMENT_CAPACITY = COMPANION_CAPABILITIES.retainedPeers;
  * watch-side companion-store state the app may want to surface or reason about.
  */
 export const MANAGEMENT_FLAG_BITS = {
-  /** The store was reset from a legacy/unversioned layout on this boot. */
+  /** A prior bond format was intentionally ignored on this boot. */
   legacyReset: 0,
   /** The persisted companion store failed its own validation and was dropped. */
   storeInvalid: 1,
@@ -56,6 +56,8 @@ export const MANAGEMENT_FLAG_BITS = {
   criticalDirty: 3,
   /** Usage (last-seen/LRU ordering) state is dirty and awaiting persist. */
   usageDirty: 4,
+  /** The empty final-format store is being committed; BLE remains gated off. */
+  formatInitializationPending: 5,
 } as const;
 
 export type ManagementFlag = keyof typeof MANAGEMENT_FLAG_BITS;
@@ -66,6 +68,7 @@ export interface ManagementFlags {
   writePending: boolean;
   criticalDirty: boolean;
   usageDirty: boolean;
+  formatInitializationPending: boolean;
 }
 
 export interface CompanionManagementStatus {
@@ -106,6 +109,7 @@ function decodeFlags(word: number): ManagementFlags {
     writePending: bit(MANAGEMENT_FLAG_BITS.writePending),
     criticalDirty: bit(MANAGEMENT_FLAG_BITS.criticalDirty),
     usageDirty: bit(MANAGEMENT_FLAG_BITS.usageDirty),
+    formatInitializationPending: bit(MANAGEMENT_FLAG_BITS.formatInitializationPending),
   };
 }
 

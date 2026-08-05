@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { usePreventRemove } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation';
 import { useWatchStore } from '../storage/store';
 import { colors, spacing } from '../ui/theme';
@@ -12,6 +13,7 @@ import { makeTransport, isSimulatorDeviceId } from '../ble/transportFactory';
 import { getUpdateSettings, saveUpdateSettings, DEFAULT_UPDATE_REPO } from '../updates/updateSettings';
 import { fetchReleases, downloadAsset, Release } from '../updates/githubReleases';
 import { readFirmwareRevision, runFirmwareUpdate, runResourcesUpdate, DfuDisabledError } from '../updates/updateRunner';
+import { UpdateOperationGate } from '../updates/updateOperationGate';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Update'>;
 
@@ -36,6 +38,14 @@ export function UpdateScreen({ route }: Props) {
   const [validateFor, setValidateFor] = useState<string | null>(null);
   const [readingRev, setReadingRev] = useState(false);
   const [revError, setRevError] = useState<string | null>(null);
+  const operationGate = useRef(new UpdateOperationGate()).current;
+
+  usePreventRemove(busy, () => {
+    showAlert(
+      'Update in progress',
+      'Stay on this screen until the transfer finishes. Leaving now can hide an update that is still running on the watch.',
+    );
+  });
 
   const deviceId = watch?.deviceId;
   const paired = !!deviceId;
@@ -141,6 +151,9 @@ export function UpdateScreen({ route }: Props) {
   };
 
   const runStep = async (fn: () => Promise<void>) => {
+    if (!operationGate.tryAcquire()) {
+      return;
+    }
     setBusy(true);
     try {
       await fn();
@@ -151,6 +164,7 @@ export function UpdateScreen({ route }: Props) {
         showAlert('Update failed', (e as Error).message);
       }
     } finally {
+      operationGate.release();
       setBusy(false);
       setProgress(null);
     }
@@ -251,7 +265,7 @@ export function UpdateScreen({ route }: Props) {
             {/* Android throttles BLE for backgrounded apps, and the watch aborts
                 the transfer after 10 s of inactivity. Leaving the app is the
                 most likely way an update dies, so say so while it is running. */}
-            <Hint>Keep this screen open until it finishes. Switching apps can interrupt the transfer.</Hint>
+            <Hint>Keep this screen open until it finishes. Back navigation is disabled; switching apps can interrupt the transfer.</Hint>
           </View>
         )}
 
