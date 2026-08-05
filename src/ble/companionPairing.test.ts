@@ -58,9 +58,13 @@ test('verifies without a prompt when the watch has room', async () => {
   });
   const out = await runVerifiedPairing(t as never, 'dev', noHooks);
   assert.equal(out.kind, 'verified');
-  // Two separate connect/disconnect cycles: status then verify.
-  assert.equal(t.connects, 2);
-  assert.equal(t.disconnects, 2);
+  // One connect/disconnect cycle covering both reads. The watch serves a single
+  // connection and must return to advertising before accepting another, so a
+  // second cycle here raced its own teardown; the simulator enforces the same
+  // limit and reset the link mid-pairing. Reading both halves in one session
+  // also strengthens the consistency check that follows.
+  assert.equal(t.connects, 1);
+  assert.equal(t.disconnects, 1);
   assert.deepEqual(t.reads, [BRIDGE_CHAR.companionStatus, BRIDGE_CHAR.companionVerify]);
 });
 
@@ -161,4 +165,25 @@ test('checkVerifyConsistency rejects a regressed count', () => {
   const before = { resetEpoch: 1, capacity: 5, evictionPolicy: 'lru', count: 3, evictionCount: 0 } as never;
   const after = { resetEpoch: 1, capacity: 5, evictionPolicy: 'lru', count: 2, evictionCount: 0 } as never;
   assert.deepEqual(checkVerifyConsistency(before, after), { ok: false, mismatch: 'countRegressed' });
+});
+
+test('the link is released across an eviction prompt, then reopened to verify', async () => {
+  // The opposite of the fast path: when the watch is full the user has to be
+  // asked something, and the watch's only connection must not be held open
+  // while a person decides. Two cycles here is correct, one would not be.
+  const t = new ScriptTransport({
+    [BRIDGE_CHAR.companionStatus]: full,
+    [BRIDGE_CHAR.companionVerify]: full,
+  });
+  let askedWhileDisconnected = false;
+  const out = await runVerifiedPairing(t as never, 'dev', {
+    async confirmEviction() {
+      askedWhileDisconnected = t.connects === t.disconnects;
+      return true;
+    },
+  });
+  assert.equal(out.kind, 'verified');
+  assert.ok(askedWhileDisconnected, 'the prompt must not run with a link held open');
+  assert.equal(t.connects, 2);
+  assert.equal(t.disconnects, 2);
 });

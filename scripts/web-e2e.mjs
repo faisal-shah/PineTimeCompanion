@@ -132,6 +132,24 @@ async function waitFor(selector, timeoutMs = 15000) {
 const click = (selector) => evalJs(`document.querySelector(${JSON.stringify(selector)}).click()`);
 const clickText = (re) => evalJs(`[...document.querySelectorAll('div')].filter((d) => ${re}.test(d.textContent)).at(-1)?.click()`);
 
+
+// Pairing now performs real reads against the watch before it stores the
+// device id, and the screen navigates back as the store update propagates. Wait
+// for the stored record rather than assuming the hub is ready the instant it
+// renders -- otherwise the next action races the save and reports "Not paired".
+async function waitForPaired(name, timeoutMs = 15000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    const ok = await evalJs(`(() => {
+      const w = JSON.parse(localStorage.getItem('pinetime-companion/watches/v1') ?? '[]');
+      return !!w.find((x) => x.name === ${JSON.stringify(name)})?.deviceId;
+    })()`);
+    if (ok) return;
+    await sleep(200);
+  }
+  throw new Error('pairing was never persisted');
+}
+
 await send('Page.enable');
 await send('Runtime.enable');
 await send('Page.navigate', { url: `http://localhost:${HTTP_PORT}/` });
@@ -155,6 +173,7 @@ await clickText('/^(Re-)?pair$/i'); // Pair action on the hub
 await waitFor('[data-testid="pair-simulator"]');
 await click('[data-testid="pair-simulator"]');
 await waitFor('[data-testid="feature-Schedule"]'); // back on the hub
+await waitForPaired(WATCH_NAME);
 console.log('4. paired with simulator (ws proxy)');
 
 // Watch actions live on the hub.

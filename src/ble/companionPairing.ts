@@ -50,24 +50,17 @@ const OPERATIONAL_KINDS = new Set(['transient', 'bluetoothOff', 'permission', 'c
  * (a characteristic the firmware does not expose) becomes `unsupported`;
  * operational failures become `error`.
  */
-export async function readManagementStatus(
-  transport: WatchTransport,
-  deviceId: string,
-  which: 'status' | 'verify',
-): Promise<ManagementReadResult> {
-  const charId = which === 'status' ? MANAGEMENT_STATUS_CHAR : MANAGEMENT_VERIFY_CHAR;
-  let raw: Uint8Array;
-  try {
-    raw = await withConnection(transport, deviceId, () => transport.read(charId));
-  } catch (e) {
-    const { kind } = classifyBleError(e);
-    if (OPERATIONAL_KINDS.has(kind)) {
-      return { kind: 'error', error: e };
-    }
-    // notFound / authorization / unknown from a plain characteristic read is how
-    // firmware without this service shows up: the characteristic isn't there.
-    return { kind: 'unsupported', reason: (e as Error)?.message ?? String(e) };
+function classifyReadFailure(e: unknown): ManagementReadResult {
+  const { kind } = classifyBleError(e);
+  if (OPERATIONAL_KINDS.has(kind)) {
+    return { kind: 'error', error: e };
   }
+  // notFound / authorization / unknown from a plain characteristic read is how
+  // firmware without this service shows up: the characteristic isn't there.
+  return { kind: 'unsupported', reason: (e as Error)?.message ?? String(e) };
+}
+
+function decodeManagementPayload(raw: Uint8Array): ManagementReadResult {
   try {
     return { kind: 'ok', status: decodeCompanionManagementStatus(raw) };
   } catch (e) {
@@ -75,6 +68,31 @@ export async function readManagementStatus(
       return { kind: 'unsupported', reason: e.message };
     }
     throw e;
+  }
+}
+
+/** Read and decode one management characteristic on a link that is already open. */
+async function readManagementOnLink(transport: WatchTransport, which: 'status' | 'verify'): Promise<ManagementReadResult> {
+  const charId = which === 'status' ? MANAGEMENT_STATUS_CHAR : MANAGEMENT_VERIFY_CHAR;
+  let raw: Uint8Array;
+  try {
+    raw = await transport.read(charId);
+  } catch (e) {
+    return classifyReadFailure(e);
+  }
+  return decodeManagementPayload(raw);
+}
+
+export async function readManagementStatus(
+  transport: WatchTransport,
+  deviceId: string,
+  which: 'status' | 'verify',
+): Promise<ManagementReadResult> {
+  try {
+    return await withConnection(transport, deviceId, () => readManagementOnLink(transport, which));
+  } catch (e) {
+    // Only the connect half can reach here; read failures are returned as values.
+    return classifyReadFailure(e);
   }
 }
 
@@ -172,7 +190,33 @@ export async function runVerifiedPairing(
   deviceId: string,
   hooks: PairingHooks,
 ): Promise<PairingOutcome> {
-  const pub = await readManagementStatus(transport, deviceId, 'status');
+  // Both reads share one link unless a prompt has to come between them.
+  //
+  // The watch serves a single connection and has to get back to advertising
+  // before it can accept another, so every extra connect/disconnect cycle is a
+  // chance to race that teardown -- the simulator now models the same limit and
+  // resets the link when a second connection arrives mid-pairing. Reading the
+  // authenticated verify on the link that produced the public status also makes
+  // the consistency check below stronger, not weaker: both halves demonstrably
+  // came from one session with one trust anchor.
+  let pub: ManagementReadResult;
+  let ver: ManagementReadResult | undefined;
+  try {
+    const pair = await withConnection(transport, deviceId, async () => {
+      const status = await readManagementOnLink(transport, 'status');
+      // Stop here if the caller has to be asked something: the link must not be
+      // held open across a human decision while it is the watch's only one.
+      if (status.kind !== 'ok' || status.status.atCapacity) {
+        return { status, verify: undefined };
+      }
+      return { status, verify: await readManagementOnLink(transport, 'verify') };
+    });
+    pub = pair.status;
+    ver = pair.verify;
+  } catch (e) {
+    return { kind: 'error', error: e };
+  }
+
   if (pub.kind === 'error') {
     return { kind: 'error', error: pub.error };
   }
@@ -189,7 +233,7 @@ export async function runVerifiedPairing(
     }
   }
 
-  const ver = await readManagementStatus(transport, deviceId, 'verify');
+  ver = ver ?? (await readManagementStatus(transport, deviceId, 'verify'));
   if (ver.kind === 'error') {
     return { kind: 'error', error: ver.error };
   }
