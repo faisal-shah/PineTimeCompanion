@@ -12,7 +12,7 @@
 // Then:                node scripts/web-e2e.mjs [dist-dir]
 // The static server and the ws-tcp proxy are started (and cleaned up) here.
 
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import fs from 'node:fs';
@@ -77,9 +77,23 @@ if (!proxyBusy) {
   await sleep(500);
 }
 
-const chromeBin = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].find((b) => {
-  try { return execFile(b, ['--version']), true; } catch { return false; }
+const chromeBin = [
+  process.env.CHROME_BIN,
+  'google-chrome',
+  'google-chrome-stable',
+  'chromium',
+  'chromium-browser',
+].filter(Boolean).find((b) => {
+  try {
+    execFileSync(b, ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 });
+if (!chromeBin) {
+  throw new Error('no Chrome or Chromium executable found');
+}
 children.push(execFile(chromeBin, [
   '--headless=new', '--disable-gpu', `--remote-debugging-port=${CDP_PORT}`,
   `--user-data-dir=${profileDir}`, '--window-size=480,900', 'about:blank',
@@ -172,9 +186,39 @@ console.log('3. watch hub open');
 await clickText('/^(Re-)?pair$/i'); // Pair action on the hub
 await waitFor('[data-testid="pair-simulator"]');
 await click('[data-testid="pair-simulator"]');
-await waitFor('[data-testid="feature-Schedule"]'); // back on the hub
+await waitFor('[data-testid="upgrade-only-banner"]'); // back on the locked hub
 await waitForPaired(WATCH_NAME);
 console.log('4. paired with simulator (ws proxy)');
+
+// Complete the one-time strict 3.0 cutover before normal features unlock.
+await click('[data-testid="feature-Update"]');
+await waitFor('[data-testid="family-protocol-check"]');
+await click('[data-testid="recheck"]');
+await waitForPaired(WATCH_NAME);
+let cutoverCleared = false;
+for (let i = 0; i < 40; i++) {
+  try {
+    cutoverCleared = await evalJs(`(() => {
+      const watches = JSON.parse(localStorage.getItem('pinetime-companion/watches/v1') ?? '[]');
+      return Boolean(watches.find((x) => x.name === ${JSON.stringify(WATCH_NAME)})?.familyCutoverClearedAt);
+    })()`);
+  } catch {
+    cutoverCleared = false;
+  }
+  if (cutoverCleared) break;
+  await sleep(250);
+}
+if (!cutoverCleared) {
+  const storedWatch = await evalJs(`(() => {
+    const watches = JSON.parse(localStorage.getItem('pinetime-companion/watches/v1') ?? '[]');
+    return watches.find((x) => x.name === ${JSON.stringify(WATCH_NAME)}) ?? null;
+  })()`);
+  throw new Error(`3.0 cutover did not complete; dialogs=${JSON.stringify(dialogs)} watch=${JSON.stringify(storedWatch)}`);
+}
+await send('Page.reload');
+await waitFor(`[data-testid="watch-${WATCH_NAME}"]`);
+await click(`[data-testid="watch-${WATCH_NAME}"]`);
+await waitFor('[data-testid="feature-Schedule"]');
 
 // Watch actions live on the hub.
 await clickText('/^Set time$/');

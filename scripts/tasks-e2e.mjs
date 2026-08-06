@@ -22,6 +22,7 @@ import { encodeBeginSync, encodeCommitSync } from '../src/ble/listProtocol.ts';
 import { encodeCurrentTime } from '../src/ble/syncManager.ts';
 import { setTaskStreak } from '../src/ble/listSyncManager.ts';
 import { BRIDGE_CHAR } from '../src/ble/transport.ts';
+import { RECORDS } from '../src/ble/generated/companionProtocol.ts';
 
 const PORT = 18632;
 const HOST = '127.0.0.1';
@@ -113,7 +114,12 @@ const TASKS = [
 await setClock(new Date(2026, 6, 20, 12, 0, 0));
 await pushTasks(TASKS, 10);
 let d = await digest();
-check(d.count === 3 && d.capacity === 20 && d.protocolVersion === 1, `push: count=${d.count} cap=${d.capacity} proto=${d.protocolVersion}`);
+check(
+  d.count === 3 &&
+    d.capacity === RECORDS.task.capacity &&
+    d.protocolVersion === RECORDS.task.protocol_version,
+  `push: count=${d.count} cap=${d.capacity} proto=${d.protocolVersion}`,
+);
 // A rollover clears whatever ticks were left over; then force streak to a known 0.
 await midnight(new Date(2026, 6, 21, 0, 5, 0));
 await setTaskStreak(makeTransport(), dev, 0);

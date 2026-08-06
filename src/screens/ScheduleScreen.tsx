@@ -15,6 +15,7 @@ import { describeEvent } from '../model/types';
 import { isSpent } from '../model/recurrence';
 import { makeTransport } from '../ble/transportFactory';
 import { ListResetError, syncSchedule } from '../ble/listSyncManager';
+import { RECORDS } from '../ble/generated/companionProtocol';
 import { pushWeather } from '../weather/pushWeather';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Schedule'>;
@@ -84,7 +85,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
     ]);
   };
 
-  const capacity = watch.schedule.capacity ?? 64;
+  const capacity = watch.schedule.capacity ?? RECORDS.schedule.capacity;
   const atCapacity = watch.schedule.items.length >= capacity;
 
   const addEvent = () => {
@@ -98,7 +99,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <FlatList
-        // flex:1 so the list scrolls; the schedule holds up to 64 events and
+        // flex:1 so the list scrolls; the schedule holds up to 32 events and
         // without this it is clipped by the footer instead. Same fix as Tasks.
         extraData={now}
         style={styles.list}

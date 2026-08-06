@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { WatchTransport, BridgeCharId, BRIDGE_CHAR } from './transport';
 import { Alarm, decodeMultiAlarm, emptyAlarm, encodeMultiAlarm } from './multiAlarmProtocol';
 import { setAlarm, updateAlarms } from './multiAlarmSync';
+import { RECORDS } from './generated/companionProtocol';
 
 // A mock watch: holds version + 5 alarms, enforces compare-and-swap on write
 // exactly like the firmware. `onBeforeWrite` lets a test inject a concurrent
@@ -25,8 +26,22 @@ class MockWatch implements WatchTransport {
   }
 
   async read(charId: BridgeCharId): Promise<Uint8Array> {
-    assert.equal(charId, BRIDGE_CHAR.multiAlarm);
-    return encodeMultiAlarm(this.version, this.alarms);
+    if (charId === BRIDGE_CHAR.multiAlarm) {
+      return encodeMultiAlarm(this.version, this.alarms);
+    }
+    if (charId === BRIDGE_CHAR.familyStateStatus) {
+      const contract = RECORDS.family_state;
+      const status = new Uint8Array(contract.status_size);
+      status[0] = contract.protocol_version;
+      status[1] = contract.snapshot_schema_version;
+      status[2] = contract.states.succeeded;
+      status[3] = contract.operations.multi_alarm;
+      status[4] = contract.errors.none;
+      new DataView(status.buffer).setUint32(6, this.version, true);
+      new DataView(status.buffer).setUint32(10, this.version, true);
+      return status;
+    }
+    throw new Error(`unexpected read ${charId}`);
   }
 
   async write(charId: BridgeCharId, data: Uint8Array): Promise<void> {

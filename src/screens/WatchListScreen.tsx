@@ -10,6 +10,7 @@ import { formatDateTime } from '../util/formatTime';
 import { newWatch, useWatchStore } from '../storage/store';
 import { needsSync } from '../model/listSync';
 import { colors, spacing } from '../ui/theme';
+import { RECORDS } from '../ble/generated/companionProtocol';
 import { CardGrid } from '../ui/CardGrid';
 import { useCapStyle } from '../ui/Screen';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
@@ -76,7 +77,7 @@ export function WatchListScreen({ navigation }: Props) {
                   <View style={styles.cardRight}>
                     {item.batteryPercent !== undefined && <Text style={styles.battery}>{item.batteryPercent}%</Text>}
                     <Text style={styles.eventCount}>
-                      {item.schedule.items.length}/{item.schedule.capacity ?? 64} events
+                      {item.schedule.items.length}/{item.schedule.capacity ?? RECORDS.schedule.capacity} events
                     </Text>
                   </View>
                 </Pressable>

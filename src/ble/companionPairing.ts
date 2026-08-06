@@ -11,7 +11,8 @@
 // status and drop the link, then reconnect for the authenticated verify — which
 // is also where the OS pairing/passkey prompt happens.
 
-import { WatchTransport, withConnection, classifyBleError } from './transport';
+import { BRIDGE_CHAR, WatchTransport, withConnection, classifyBleError } from './transport';
+import { decodeFamilyStateStatus, FamilyStateStatus } from './familyStateProtocol';
 import {
   CompanionManagementStatus,
   ManagementProtocolError,
@@ -38,6 +39,11 @@ import {
 export type ManagementReadResult =
   | { kind: 'ok'; status: CompanionManagementStatus }
   | { kind: 'unsupported'; reason: string }
+  | { kind: 'error'; error: unknown };
+
+type FamilyReadResult =
+  | { kind: 'ok'; status: FamilyStateStatus }
+  | { kind: 'unsupported' }
   | { kind: 'error'; error: unknown };
 
 // Kinds that mean "the watch is reachable but this characteristic operation
@@ -81,6 +87,20 @@ async function readManagementOnLink(transport: WatchTransport, which: 'status' |
     return classifyReadFailure(e);
   }
   return decodeManagementPayload(raw);
+}
+
+async function readFamilyOnLink(transport: WatchTransport): Promise<FamilyReadResult> {
+  try {
+    return {
+      kind: 'ok',
+      status: decodeFamilyStateStatus(await transport.read(BRIDGE_CHAR.familyStateStatus)),
+    };
+  } catch (error) {
+    const { kind } = classifyBleError(error);
+    return OPERATIONAL_KINDS.has(kind)
+      ? { kind: 'error', error }
+      : { kind: 'unsupported' };
+  }
 }
 
 export async function readManagementStatus(
@@ -157,7 +177,7 @@ export function checkVerifyConsistency(before: CompanionManagementStatus, after:
  * - `error` — an operational failure (surface it; do not save).
  */
 export type PairingOutcome =
-  | { kind: 'verified'; status: CompanionManagementStatus }
+  | { kind: 'verified'; status: CompanionManagementStatus; familyStatus?: FamilyStateStatus }
   | { kind: 'cancelled' }
   | { kind: 'legacy'; reason: string }
   | { kind: 'mismatch'; before: CompanionManagementStatus; after: CompanionManagementStatus; mismatch: VerifyMismatch }
@@ -201,18 +221,25 @@ export async function runVerifiedPairing(
   // came from one session with one trust anchor.
   let pub: ManagementReadResult;
   let ver: ManagementReadResult | undefined;
+  let family: FamilyReadResult | undefined;
   try {
     const pair = await withConnection(transport, deviceId, async () => {
       const status = await readManagementOnLink(transport, 'status');
       // Stop here if the caller has to be asked something: the link must not be
       // held open across a human decision while it is the watch's only one.
       if (status.kind !== 'ok' || status.status.atCapacity) {
-        return { status, verify: undefined };
+        return { status, verify: undefined, family: undefined };
       }
-      return { status, verify: await readManagementOnLink(transport, 'verify') };
+      const verify = await readManagementOnLink(transport, 'verify');
+      return {
+        status,
+        verify,
+        family: verify.kind === 'ok' ? await readFamilyOnLink(transport) : undefined,
+      };
     });
     pub = pair.status;
     ver = pair.verify;
+    family = pair.family;
   } catch (e) {
     return { kind: 'error', error: e };
   }
@@ -233,7 +260,21 @@ export async function runVerifiedPairing(
     }
   }
 
-  ver = ver ?? (await readManagementStatus(transport, deviceId, 'verify'));
+  if (ver === undefined) {
+    try {
+      const pair = await withConnection(transport, deviceId, async () => {
+        const verify = await readManagementOnLink(transport, 'verify');
+        return {
+          verify,
+          family: verify.kind === 'ok' ? await readFamilyOnLink(transport) : undefined,
+        };
+      });
+      ver = pair.verify;
+      family = pair.family;
+    } catch (error) {
+      return { kind: 'error', error };
+    }
+  }
   if (ver.kind === 'error') {
     return { kind: 'error', error: ver.error };
   }
@@ -247,5 +288,15 @@ export async function runVerifiedPairing(
   if (!check.ok) {
     return { kind: 'mismatch', before: pub.status, after: ver.status, mismatch: check.mismatch! };
   }
-  return { kind: 'verified', status: ver.status };
+
+  if (family?.kind === 'error') {
+    return { kind: 'error', error: family.error };
+  }
+  // A verified 2.x watch has companion management but no 3.0 family-state
+  // service. Keep the verified bond and mark it upgrade-only in the UI.
+  return {
+    kind: 'verified',
+    status: ver.status,
+    familyStatus: family?.kind === 'ok' ? family.status : undefined,
+  };
 }

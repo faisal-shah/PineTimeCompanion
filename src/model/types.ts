@@ -122,6 +122,15 @@ export interface Watch {
   forwardNotifications?: boolean;
   /** Last-seen companion-management state; drives repair diagnostics. Absent on legacy pairings. */
   management?: CompanionManagement;
+  /** Exact family-state protocol confirmed after the 3.0 cutover. */
+  familyProtocol?: {
+    protocolVersion: number;
+    snapshotSchemaVersion: number;
+    activeGeneration: number;
+    confirmedAt: string;
+  };
+  /** Records the explicit local-data reset after confirming the 3.0 firmware. */
+  familyCutoverClearedAt?: string;
 
   /** recurring reminders — watch-authoritative synced list */
   schedule: SyncedList<WatchEvent>;

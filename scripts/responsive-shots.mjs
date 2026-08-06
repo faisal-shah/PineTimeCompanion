@@ -108,7 +108,7 @@ const mkWatch = (id, name, battery) => ({
   lastSyncAt: new Date().toISOString(), batteryPercent: battery,
   prayerSettings: { method: 'ummAlQura', asrMadhab: 'standard', alertsEnabled: true, latE2: 2142, lonE2: 3983, utcOffsetQuarters: 12, editedAt: nowSec },
   forwardNotifications: false,
-  schedule: { items: events, version: 3, syncedVersion: 3, base: { version: 3, syncedAt: nowSec, items: events }, capacity: 64 },
+  schedule: { items: events, version: 3, syncedVersion: 3, base: { version: 3, syncedAt: nowSec, items: events }, capacity: 32 },
   tasks: { items: tasks, version: 4, syncedVersion: 4, base: { version: 4, syncedAt: nowSec, items: tasks }, capacity: 20 },
   taskStreak: 12,
 });

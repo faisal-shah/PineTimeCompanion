@@ -10,6 +10,12 @@ import { decodeStepCount } from './stepsProtocol';
 import { BEACON_CONTROL_ENABLE } from './beaconProtocol';
 import { BRIDGE_CHAR, TransportError, WatchTransport, withConnection } from './transport';
 import { encodeCurrentTime } from './ctsProtocol';
+import {
+  decodeFamilyStateStatus,
+  FamilyStateStatus,
+  waitForFamilyStateCommit,
+} from './familyStateProtocol';
+import { familyStateMutationToken } from './familyStateMutationToken';
 
 export { encodeCurrentTime };
 
@@ -43,6 +49,31 @@ export async function readBattery(transport: WatchTransport, deviceId: string): 
       throw new TransportError('empty battery read');
     }
     return payload[0];
+  });
+}
+
+export async function readFamilyStateStatus(
+  transport: WatchTransport,
+  deviceId: string,
+): Promise<FamilyStateStatus> {
+  return withConnection(transport, deviceId, async () => {
+    return decodeFamilyStateStatus(await transport.read(BRIDGE_CHAR.familyStateStatus));
+  });
+}
+
+export async function readFirmwareFamilyState(
+  transport: WatchTransport,
+  deviceId: string,
+): Promise<{ revision: string; status: FamilyStateStatus }> {
+  return withConnection(transport, deviceId, async () => {
+    const revision = new TextDecoder()
+      .decode(await transport.read(BRIDGE_CHAR.firmwareRevision))
+      .replace(/\0+$/, '')
+      .trim();
+    const status = decodeFamilyStateStatus(
+      await transport.read(BRIDGE_CHAR.familyStateStatus),
+    );
+    return { revision, status };
   });
 }
 
@@ -87,22 +118,18 @@ export async function readStepCounts(
 }
 
 /**
- * Write prayer settings and verify by read-back. The watch commits the write
- * asynchronously on its SystemTask, so the read-back retries briefly before
- * concluding the write was lost.
+ * Write prayer settings and wait for the matching durable family-state commit.
  */
 export async function writePrayerSettings(transport: WatchTransport, deviceId: string, settings: WireSettings): Promise<void> {
   const blob = encodePrayerSettings(settings);
+  const token = familyStateMutationToken(blob);
   return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.prayerSettings, blob);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await new Promise((r) => setTimeout(r, 200));
-      const echoed = await transport.read(BRIDGE_CHAR.prayerSettings);
-      if (echoed.length === blob.length && echoed.every((b, i) => b === blob[i])) {
-        return;
-      }
+    await waitForFamilyStateCommit(transport, 'prayer_settings', token);
+    const echoed = await transport.read(BRIDGE_CHAR.prayerSettings);
+    if (echoed.length !== blob.length || !echoed.every((b, i) => b === blob[i])) {
+      throw new TransportError('watch published different prayer settings');
     }
-    throw new TransportError('watch did not confirm the prayer settings');
   });
 }
 
@@ -122,8 +149,10 @@ export async function writeBeaconKey(transport: WatchTransport, deviceId: string
   if (advKey.length !== 28) {
     throw new TransportError(`advertisement key must be 28 bytes, got ${advKey.length}`);
   }
+  const token = familyStateMutationToken(advKey);
   return withConnection(transport, deviceId, async () => {
     await transport.write(BRIDGE_CHAR.beaconKey, advKey);
+    await waitForFamilyStateCommit(transport, 'beacon_key', token);
     const status = await transport.read(BRIDGE_CHAR.beaconKey);
     if (status.length < 1 || status[0] !== 1) {
       throw new TransportError('watch did not confirm the beacon key');

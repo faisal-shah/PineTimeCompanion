@@ -3,7 +3,6 @@
 // react-native-ble-plx. Only bleTransport.ts cannot be exercised without a
 // physical watch.
 
-import { encodeCurrentTime } from './ctsProtocol';
 import { BRIDGE_CHAR } from './generated/companionProtocol';
 import type { BridgeCharId } from './generated/companionProtocol';
 import { getCoordinator } from './connectionCoordinator';
@@ -89,9 +88,8 @@ export const DEFAULT_MTU = 256;
  * native notification-forwarding link to the same watch first and resume it
  * after. That whole envelope — pause, connect-with-retry, disconnect, resume —
  * is owned by the app-wide ConnectionCoordinator; this helper adds the
- * per-connection MTU negotiation and clock set that every ordinary op wants,
- * then runs `fn`. `mtu` is requested when given; the caller checks the
- * negotiated value.
+ * per-connection MTU negotiation, then runs `fn`. `mtu` is requested when
+ * given; the caller checks the negotiated value.
  */
 export async function withConnection<T>(
   transport: WatchTransport,
@@ -103,21 +101,6 @@ export async function withConnection<T>(
     // Best-effort: a watch that refuses still handles the short writes, so
     // don't fail the whole operation over it.
     await transport.requestMtu(mtu).catch(() => undefined);
-    // Set the clock on every connection we make. The watch loses its time on
-    // power loss, and on a firmware image whose memory layout shifted, and it
-    // cannot tell that state from a real date -- it shows 1 January of the build
-    // year and computes prayer times for it, confidently. Ten bytes on a link
-    // that is already open, and it needs no pairing. Best-effort for the same
-    // reason as the MTU: never fail the user's actual operation over it. The DFU
-    // path deliberately does not come through here, so this never races a
-    // rebooting watch.
-    await transport.write(BRIDGE_CHAR.currentTime, encodeCurrentTime(new Date())).catch((e) => {
-      // Never fail the user's actual operation over the clock. But do say so:
-      // a watch whose clock silently never gets set is precisely the fault this
-      // write exists to prevent, and the manual "Set time" button surfaces the
-      // same error properly if it keeps happening.
-      console.warn('could not set the watch clock:', (e as Error)?.message ?? e);
-    });
     return await fn();
   });
 }

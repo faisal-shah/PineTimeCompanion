@@ -28,7 +28,7 @@ test('EventRecord golden vector: weekly Quran practice', () => {
   assert.equal(
     hex(encodeEventMessage(0, event)),
     // trailing '00000000' is the end date: year 0 = never ends
-    '010200' + '0100021100ea07070d2a01' + '517572616e207072616374696365' + '00'.repeat(10) + '00ae556a' + '00000000'
+    '010300' + '0100021100ea07070d2a01' + '517572616e207072616374696365' + '00'.repeat(10) + '00ae556a' + '00000000'
   );
   // decoder round-trips the encoder
   assert.deepEqual(decodeEventRecord(encodeEventRecord(event)), event);
@@ -47,7 +47,7 @@ test('EventRecord golden vector: daily Brush teeth', () => {
   };
   assert.equal(
     hex(encodeEventMessage(1, event)),
-    '010201' + '020001141eea0701010101' + '427275736820746565746800' + '00'.repeat(12) + '00000000' + '00000000'
+    '010301' + '020001141eea0701010101' + '427275736820746565746800' + '00'.repeat(12) + '00000000' + '00000000'
   );
 });
 
@@ -64,7 +64,7 @@ test('EventRecord golden vector: one-shot Dentist', () => {
   };
   assert.equal(
     hex(encodeEventMessage(2, event)),
-    '010202' + '030000090fea0708010001' + '44656e74697374' + '00'.repeat(17) + '00000000' + '00000000'
+    '010302' + '030000090fea0708010001' + '44656e74697374' + '00'.repeat(17) + '00000000' + '00000000'
   );
 });
 
@@ -74,13 +74,13 @@ test('CommitSync and AbortSync', () => {
 });
 
 test('Digest golden vector round-trip', () => {
-  const digest = decodeDigest(Uint8Array.from(Buffer.from('01100307000000', 'hex')));
-  assert.deepEqual(digest, { protocolVersion: 1, capacity: 16, count: 3, version: 7 });
+  const digest = decodeDigest(Uint8Array.from(Buffer.from('03200307000000', 'hex')));
+  assert.deepEqual(digest, { protocolVersion: 3, capacity: 32, count: 3, version: 7 });
 });
 
-test('Digest from a 64-slot watch (doc/ScheduleService.md example)', () => {
-  const digest = decodeDigest(Uint8Array.from(Buffer.from('01400307000000', 'hex')));
-  assert.deepEqual(digest, { protocolVersion: 1, capacity: 64, count: 3, version: 7 });
+test('Digest from a 32-slot watch (doc/ScheduleService.md example)', () => {
+  const digest = decodeDigest(Uint8Array.from(Buffer.from('03200307000000', 'hex')));
+  assert.deepEqual(digest, { protocolVersion: 3, capacity: 32, count: 3, version: 7 });
 });
 
 test('title truncation respects UTF-8 boundaries', () => {

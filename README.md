@@ -188,10 +188,16 @@ Two separate actions on WatchDetail:
   repair still fails does it point at the watch's own *Settings > Bluetooth >
   Forget all*, warning that this affects every paired phone.
 
-InfiniTime 2.0.2 intentionally starts with an empty final-format bond store
-instead of importing either older format, including v1.26.0. Every phone and
-computer pairs once after that upgrade; schedules, tasks, alarms, settings, and
-resources remain intact.
+InfiniTime 3.0 is a strict family-state cutover. Before flashing, the Update
+screen requires confirmation that schedules, tasks, prayer settings and alarms
+were captured, and blocks the update if the phone holds more than 32 schedule
+entries. Older firmware is upgrade-only in this companion.
+
+After the watch reports InfiniTime 3.0 and a healthy family-state protocol, the
+companion asks before clearing incompatible local schedule, task, streak, prayer
+and Find My data. The user re-enters it from the captured screenshots. BLE bonds
+remain separate. If the app is restarted after flashing, **Check 3.0 status** on
+the Update screen resumes this confirmation.
 
 ## Updating a watch (OTA)
 
@@ -214,6 +220,9 @@ Two independent BLE operations make up a full update:
 - **Resources** — the Adafruit BLE filesystem (`fsClient.ts`, FSService
   `0xFEBB`): mkdir the parent dirs, write each file in 235-byte lockstep chunks,
   delete obsolete files. Works on every platform.
+
+Ordinary companion operations do not set the watch clock. Only the explicit
+**Set time** action writes the Current Time Service.
 
 Both need **Settings ▸ "Firmware & files"** enabled on the watch (the disabled
 state returns insufficient-authorization, which the app translates into a plain

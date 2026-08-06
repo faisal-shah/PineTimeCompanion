@@ -47,24 +47,10 @@ class FakeTransport implements WatchTransport {
   }
 }
 
-test('every app operation sets the watch clock', async () => {
+test('ordinary app operations do not change the watch clock', async () => {
   const t = new FakeTransport();
   await withConnection(t, 'AA:BB', async () => {
     await t.write(BRIDGE_CHAR.battery, new Uint8Array());
   });
-  assert.equal(t.writes[0], BRIDGE_CHAR.currentTime, 'the clock is set before the operation runs');
-});
-
-test('a watch that rejects the clock write does not fail the operation', async () => {
-  // Best-effort: an older or busy watch must not break a sync.
-  const t = new FakeTransport();
-  t.write = async (charId: number, _payload: Uint8Array) => {
-    if (charId === BRIDGE_CHAR.currentTime) throw new Error('no such characteristic');
-    t.writes.push(charId);
-  };
-  let ran = false;
-  await withConnection(t, 'AA:BB', async () => {
-    ran = true;
-  });
-  assert.ok(ran, 'the operation still ran');
+  assert.deepEqual(t.writes, [BRIDGE_CHAR.battery]);
 });

@@ -1,5 +1,5 @@
 // Generated from protocol/companion.json.
-// Manifest SHA-256: 6a3dc57bba4cb3ef146be88209256026e5a531f0fbad6079e34a14692dcd0949
+// Manifest SHA-256: f4881c3833b552227463a5af2f4a07f110ec1c67f7ff44d1f193af15b9d6750c
 // Do not edit by hand.
 package dev.faisal.pinetimecompanion.notifyfwd
 
@@ -117,6 +117,9 @@ object GeneratedCompanionProtocol {
   const val COMPANION_VERIFY_BRIDGE_ID = 34
   val COMPANION_VERIFY_SERVICE_UUID: UUID = UUID.fromString("000b0000-78fc-48fe-8e23-433b3a1942d0")
   val COMPANION_VERIFY_UUID: UUID = UUID.fromString("000b0002-78fc-48fe-8e23-433b3a1942d0")
+  const val FAMILY_STATE_STATUS_BRIDGE_ID = 35
+  val FAMILY_STATE_STATUS_SERVICE_UUID: UUID = UUID.fromString("000c0000-78fc-48fe-8e23-433b3a1942d0")
+  val FAMILY_STATE_STATUS_UUID: UUID = UUID.fromString("000c0001-78fc-48fe-8e23-433b3a1942d0")
   val HEART_RATE_MEASUREMENT_SERVICE_UUID: UUID = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb")
   val HEART_RATE_MEASUREMENT_UUID: UUID = UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb")
   val MOTION_VALUES_SERVICE_UUID: UUID = UUID.fromString("00030000-78fc-48fe-8e23-433b3a1942d0")

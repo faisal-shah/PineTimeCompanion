@@ -153,6 +153,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
   };
 
   const paired = !!watch.deviceId;
+  const upgradeOnly = paired && watch.familyCutoverClearedAt === undefined;
   const lastSync = watch.lastSyncAt ? new Date(watch.lastSyncAt).toLocaleDateString() : null;
 
   const removeFromApp = () => {
@@ -288,8 +289,17 @@ export function WatchDetailScreen({ navigation, route }: Props) {
 
         {/* Feature peers — a responsive grid: multi-column on a wide screen, one
             full-width column on a phone. */}
+        {upgradeOnly && (
+          <View style={styles.upgradeBanner} testID="upgrade-only-banner">
+            <Text style={styles.upgradeBannerTitle}>Firmware upgrade required</Text>
+            <Text style={styles.upgradeBannerText}>
+              This companion configures InfiniTime 3.0 watches. Capture your old schedule, tasks, prayer settings and
+              alarms, then use Update watch below. Other configuration is disabled until 3.0 is confirmed.
+            </Text>
+          </View>
+        )}
         <CardGrid>
-          {FEATURES.map((f) => (
+          {FEATURES.filter((feature) => !upgradeOnly || feature.key === 'Update').map((f) => (
             <Pressable
               key={f.key}
               style={styles.featureRow}
@@ -311,8 +321,8 @@ export function WatchDetailScreen({ navigation, route }: Props) {
         </CardGrid>
 
         {/* Watch actions */}
-        <Text style={styles.sectionLabel}>Watch</Text>
-        <View style={styles.actions}>
+        {!upgradeOnly && <Text style={styles.sectionLabel}>Watch</Text>}
+        {!upgradeOnly && <View style={styles.actions}>
           {paired ? (
             <ActionButton
               icon="🔧"
@@ -334,7 +344,7 @@ export function WatchDetailScreen({ navigation, route }: Props) {
           <ActionButton icon="🕑" label="Set time" onPress={doSetTime} disabled={actionsDisabled} busy={op.busy === 'Set time'} />
           <ActionButton icon="🔋" label="Battery" onPress={doBattery} disabled={actionsDisabled} busy={op.busy === 'Battery'} />
           <ActionButton icon="✉️" label="Message" onPress={doMessage} disabled={actionsDisabled} busy={op.busy === 'Message'} />
-        </View>
+        </View>}
 
         <View style={styles.deleteWrap}>
           <Button label="Delete watch" variant="danger" onPress={deleteWatch} testID="delete-watch" />
@@ -419,6 +429,16 @@ const styles = StyleSheet.create({
 
   pending: { color: colors.warn, fontSize: 12, marginRight: spacing(1) },
   deleteWrap: { marginTop: spacing(4) },
+  upgradeBanner: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.warn,
+    borderRadius: 12,
+    padding: spacing(2),
+    marginBottom: spacing(2),
+  },
+  upgradeBannerTitle: { color: colors.warn, fontSize: 16, fontWeight: '700' },
+  upgradeBannerText: { color: colors.text, fontSize: 14, lineHeight: 20, marginTop: spacing(0.75) },
 
   repairBody: { color: colors.text, fontSize: 14, lineHeight: 20, marginTop: spacing(1.5) },
   repairButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing(1), marginTop: spacing(2) },

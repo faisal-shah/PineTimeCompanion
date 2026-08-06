@@ -8,10 +8,6 @@ import java.util.UUID
  * Bridge ids are locked to InfiniSim's sim/gatt_bridge.h enum.
  */
 enum class WatchChar(val simCharId: Int, val gattUuid: UUID) {
-  // Current Time Service. Needs no pairing, which is what lets the forwarder
-  // set the clock on a watch that has never been bonded to this phone.
-  CURRENT_TIME(GeneratedCompanionProtocol.CURRENT_TIME_BRIDGE_ID, GeneratedCompanionProtocol.CURRENT_TIME_UUID),
-
   // Alert Notification Service.
   NEW_ALERT(GeneratedCompanionProtocol.NEW_ALERT_BRIDGE_ID, GeneratedCompanionProtocol.NEW_ALERT_UUID),
   CALL_EVENT(GeneratedCompanionProtocol.CALL_EVENT_BRIDGE_ID, GeneratedCompanionProtocol.CALL_EVENT_UUID), // notify
@@ -32,7 +28,6 @@ enum class WatchChar(val simCharId: Int, val gattUuid: UUID) {
 
   companion object {
     val ANS_SERVICE: UUID = GeneratedCompanionProtocol.NEW_ALERT_SERVICE_UUID
-    val CTS_SERVICE: UUID = GeneratedCompanionProtocol.CURRENT_TIME_SERVICE_UUID
     val MUSIC_SERVICE: UUID = GeneratedCompanionProtocol.MUSIC_EVENT_SERVICE_UUID
 
     fun bySimCharId(id: Int): WatchChar? = entries.firstOrNull { it.simCharId == id }

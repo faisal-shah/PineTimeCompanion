@@ -47,8 +47,8 @@ export function encodeTaskMessage(index: number, task: WatchTask): Uint8Array {
 }
 
 /** Phone override of the watch's streak counter. */
-export function encodeSetStreak(streak: number): Uint8Array {
-  return new Uint8Array([0x04, 0x00, ...u16le(streak & 0xffff)]);
+export function encodeSetStreak(streak: number, token: number): Uint8Array {
+  return new Uint8Array([0x04, 0x00, ...u16le(streak & 0xffff), ...u32le(token >>> 0)]);
 }
 
 /** Digest = the shared list header + a trailing streak u16. */

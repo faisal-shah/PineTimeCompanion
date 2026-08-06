@@ -13,6 +13,8 @@ import { FoundWatch, ScanHandle, scanForWatches } from '../ble/pairScan';
 import { PairingOutcome, VerifyMismatch, runVerifiedPairing } from '../ble/companionPairing';
 import { presentWatchOpError } from '../ui/watchOpError';
 import { managementFromStatus } from '../model/types';
+import type { FamilyStateStatus } from '../ble/familyStateProtocol';
+import { RECORDS } from '../ble/generated/companionProtocol';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WatchPair'>;
 
@@ -73,11 +75,35 @@ export function WatchPairScreen({ navigation, route }: Props) {
   // Persist a verified pairing. The deviceId is saved only here and in
   // finishLegacy — never on mere selection — so an existing entry is never
   // overwritten until verification (or an explicit legacy accept) succeeds.
-  const finishVerified = (deviceId: string, status: Parameters<typeof managementFromStatus>[0]) => {
+  const finishVerified = (
+    deviceId: string,
+    status: Parameters<typeof managementFromStatus>[0],
+    familyStatus?: FamilyStateStatus,
+  ) => {
     if (!watch) {
       return;
     }
-    upsertWatch({ ...watch, deviceId, management: managementFromStatus(status, { verified: true }) });
+    const preserveCutover =
+      familyStatus !== undefined &&
+      watch.deviceId === deviceId &&
+      watch.familyCutoverClearedAt !== undefined;
+    upsertWatch({
+      ...watch,
+      deviceId,
+      management: managementFromStatus(status, { verified: true }),
+      familyProtocol:
+        !preserveCutover
+          ? undefined
+          : {
+              protocolVersion: RECORDS.family_state.protocol_version,
+              snapshotSchemaVersion: RECORDS.family_state.snapshot_schema_version,
+              activeGeneration: familyStatus.activeGeneration,
+              confirmedAt: new Date().toISOString(),
+            },
+      familyCutoverClearedAt: preserveCutover
+        ? watch.familyCutoverClearedAt
+        : undefined,
+    });
     navigation.goBack();
   };
 
@@ -88,14 +114,20 @@ export function WatchPairScreen({ navigation, route }: Props) {
     // Legacy: no verification was possible, so record no management metadata.
     // The deviceId is still saved (the user explicitly accepted), but nothing
     // claims the bond was proven.
-    upsertWatch({ ...watch, deviceId, management: undefined });
+    upsertWatch({
+      ...watch,
+      deviceId,
+      management: undefined,
+      familyProtocol: undefined,
+      familyCutoverClearedAt: undefined,
+    });
     navigation.goBack();
   };
 
   const handleOutcome = async (deviceId: string, outcome: PairingOutcome) => {
     switch (outcome.kind) {
       case 'verified':
-        finishVerified(deviceId, outcome.status);
+        finishVerified(deviceId, outcome.status, outcome.familyStatus);
         return;
       case 'cancelled':
         // The user declined the eviction confirmation: leave the app unchanged.

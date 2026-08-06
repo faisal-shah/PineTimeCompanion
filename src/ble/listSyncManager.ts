@@ -9,8 +9,9 @@ import { Watch, WatchEvent, WatchTask } from '../model/types';
 import { ListItem, ListMergeRules, ListSyncBase, MergeNotice, SyncedList, looksLikeReset, mergeList } from '../model/listSync';
 import { ListDigest, encodeAbortSync, encodeBeginSync, encodeCommitSync, encodeRecordMessage } from './listProtocol';
 import { BRIDGE_CHAR, BridgeCharId, TransportError, WatchTransport, withConnection } from './transport';
-import { SCHEDULE_RECORD_VERSION, decodeDigest, decodeEventRecord, encodeEventRecord } from './scheduleProtocol';
-import { TASK_RECORD_VERSION, TaskDigest, decodeTaskDigest, decodeTaskRecord, encodeSetStreak, encodeTaskRecord } from './tasksProtocol';
+import { PROTOCOL_VERSION as SCHEDULE_PROTOCOL_VERSION, SCHEDULE_RECORD_VERSION, decodeDigest, decodeEventRecord, encodeEventRecord } from './scheduleProtocol';
+import { PROTOCOL_VERSION as TASK_PROTOCOL_VERSION, TASK_RECORD_VERSION, TaskDigest, decodeTaskDigest, decodeTaskRecord, encodeSetStreak, encodeTaskRecord } from './tasksProtocol';
+import { FamilyStateOperation, waitForFamilyStateCommit } from './familyStateProtocol';
 
 const MIN_MTU = 50; // largest record message (event: 3 + 43 B) + ATT overhead
 const randomVersion = () => 1 + Math.floor(Math.random() * 0xfffffffe);
@@ -57,6 +58,8 @@ export interface ListSpec<T extends ListItem, D extends ListDigest> {
   protocolVersion: number;
   /** The RecordMessage version byte; the watch rejects anything else. */
   recordVersion: number;
+  /** Family-state operation used to confirm durable publication. */
+  operation: FamilyStateOperation;
   chars: { sync: BridgeCharId; digest: BridgeCharId; read: BridgeCharId };
   rules: ListMergeRules<T>;
   encodeRecord(item: T): Uint8Array;
@@ -95,15 +98,11 @@ async function pushList<T extends ListItem, D extends ListDigest>(transport: Wat
     await transport.write(spec.chars.sync, encodeAbortSync()).catch(() => undefined);
     throw e;
   }
-  // Commit is applied on the watch's system task; poll the digest briefly.
-  for (let attempt = 0; attempt < 10; attempt++) {
-    await new Promise((r) => setTimeout(r, 150));
-    const digest = spec.decodeDigest(await transport.read(spec.chars.digest));
-    if (digest.version === version && digest.count === items.length) {
-      return;
-    }
+  await waitForFamilyStateCommit(transport, spec.operation, version);
+  const digest = spec.decodeDigest(await transport.read(spec.chars.digest));
+  if (digest.version !== version || digest.count !== items.length) {
+    throw new TransportError(`watch persisted ${spec.label} but did not publish the committed list`);
   }
-  throw new TransportError(`watch did not confirm the ${spec.label} sync`);
 }
 
 /**
@@ -166,8 +165,9 @@ export async function syncList<T extends ListItem, D extends ListDigest>(
 // ---- concrete list specs ----
 
 export const scheduleSpec: ListSpec<WatchEvent, ListDigest> = {
-  protocolVersion: 2, // 43-byte records, with the recurring end date
+  protocolVersion: SCHEDULE_PROTOCOL_VERSION,
   recordVersion: SCHEDULE_RECORD_VERSION,
+  operation: 'schedule',
   label: 'schedule',
   chars: { sync: BRIDGE_CHAR.scheduleSync, digest: BRIDGE_CHAR.scheduleDigest, read: BRIDGE_CHAR.eventRead },
   rules: {
@@ -187,8 +187,9 @@ export const scheduleSpec: ListSpec<WatchEvent, ListDigest> = {
 };
 
 export const taskSpec: ListSpec<WatchTask, TaskDigest> = {
-  protocolVersion: 1,
+  protocolVersion: TASK_PROTOCOL_VERSION,
   recordVersion: TASK_RECORD_VERSION,
+  operation: 'tasks',
   label: 'task list',
   chars: { sync: BRIDGE_CHAR.tasksSync, digest: BRIDGE_CHAR.tasksDigest, read: BRIDGE_CHAR.taskRead },
   rules: {
@@ -213,14 +214,12 @@ export function syncTasks(transport: WatchTransport, watch: Watch, acceptReset =
 /** Override the watch's streak counter (parent forgives a missed day / sets a reward). */
 export async function setTaskStreak(transport: WatchTransport, deviceId: string, streak: number): Promise<void> {
   return withConnection(transport, deviceId, async () => {
-    await transport.write(BRIDGE_CHAR.tasksSync, encodeSetStreak(streak));
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await new Promise((r) => setTimeout(r, 150));
-      const digest = decodeTaskDigest(await transport.read(BRIDGE_CHAR.tasksDigest));
-      if (digest.streak === (streak & 0xffff)) {
-        return;
-      }
+    const token = randomVersion();
+    await transport.write(BRIDGE_CHAR.tasksSync, encodeSetStreak(streak, token));
+    await waitForFamilyStateCommit(transport, 'task_streak', token);
+    const digest = decodeTaskDigest(await transport.read(BRIDGE_CHAR.tasksDigest));
+    if (digest.streak !== (streak & 0xffff)) {
+      throw new TransportError('watch persisted the streak but did not publish it');
     }
-    throw new TransportError('watch did not confirm the streak change');
   });
 }

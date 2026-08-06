@@ -8,12 +8,20 @@ import { colors, spacing } from '../ui/theme';
 import { Screen } from '../ui/Screen';
 import { Hint } from '../ui/Hint';
 import { Button } from '../ui/Button';
+import { Dialog, DialogActions, DialogButton, DialogSubtitle, DialogTitle } from '../ui/Dialog';
 import { showAlert } from '../ui/alert';
 import { makeTransport, isSimulatorDeviceId } from '../ble/transportFactory';
 import { getUpdateSettings, saveUpdateSettings, DEFAULT_UPDATE_REPO } from '../updates/updateSettings';
 import { fetchReleases, downloadAsset, Release } from '../updates/githubReleases';
 import { readFirmwareRevision, runFirmwareUpdate, runResourcesUpdate, DfuDisabledError } from '../updates/updateRunner';
 import { UpdateOperationGate } from '../updates/updateOperationGate';
+import { deleteBeaconPrivateKey } from '../secure/secrets';
+import { readFirmwareFamilyState } from '../ble/syncManager';
+import {
+  clearWatchForFamilyCutover,
+  familyCutoverBlockReason,
+  isFamilyCutoverVersion,
+} from '../updates/familyCutover';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Update'>;
 
@@ -23,7 +31,7 @@ interface Progress {
 }
 
 export function UpdateScreen({ route }: Props) {
-  const { watches } = useWatchStore();
+  const { watches, upsertWatch } = useWatchStore();
   const watch = watches.find((w) => w.id === route.params.watchId);
 
   const [repo, setRepo] = useState(DEFAULT_UPDATE_REPO);
@@ -38,6 +46,8 @@ export function UpdateScreen({ route }: Props) {
   const [validateFor, setValidateFor] = useState<string | null>(null);
   const [readingRev, setReadingRev] = useState(false);
   const [revError, setRevError] = useState<string | null>(null);
+  const [cutoverRelease, setCutoverRelease] = useState<Release | null>(null);
+  const [cutoverAcknowledged, setCutoverAcknowledged] = useState(false);
   const operationGate = useRef(new UpdateOperationGate()).current;
 
   usePreventRemove(busy, () => {
@@ -108,31 +118,44 @@ export function UpdateScreen({ route }: Props) {
     }
   };
 
-  const flashFirmware = (release: Release) => {
+  const runFirmwareFlash = (release: Release) => {
     if (!deviceId || !release.dfuUrl) return;
+    setValidateFor(null);
+    void runStep(async () => {
+      const bytes = await downloadAsset(release.dfuUrl!, (recv, total) =>
+        setProgress({ label: 'Downloading firmware', pct: total ? (recv / total) * 100 : 0 }),
+      );
+      await runFirmwareUpdate(makeTransport(deviceId), deviceId, bytes, (p) =>
+        setProgress({
+          label: p.phase === 'transfer' ? 'Flashing firmware' : `Firmware: ${p.phase}`,
+          pct: p.total ? (p.sent / p.total) * 100 : 0,
+        }),
+      );
+      setValidateFor(release.version);
+    });
+  };
+
+  const flashFirmware = (release: Release) => {
+    if (!watch || !deviceId || !release.dfuUrl) return;
+    if (
+      isFamilyCutoverVersion(release.version) &&
+      watch.familyCutoverClearedAt === undefined
+    ) {
+      const reason = familyCutoverBlockReason(watch);
+      if (reason !== null) {
+        showAlert('Reduce the schedule first', reason);
+        return;
+      }
+      setCutoverAcknowledged(false);
+      setCutoverRelease(release);
+      return;
+    }
     showAlert(
       `Flash firmware ${release.version}?`,
       'The watch will reboot into the new firmware. You must then tap Validate on the watch to keep it — otherwise the next reboot rolls it back.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Flash',
-          onPress: () => {
-            setValidateFor(null);
-            void runStep(async () => {
-              const bytes = await downloadAsset(release.dfuUrl!, (recv, total) =>
-                setProgress({ label: 'Downloading firmware', pct: total ? (recv / total) * 100 : 0 }),
-              );
-              await runFirmwareUpdate(makeTransport(deviceId), deviceId, bytes, (p) =>
-                setProgress({
-                  label: p.phase === 'transfer' ? 'Flashing firmware' : `Firmware: ${p.phase}`,
-                  pct: p.total ? (p.sent / p.total) * 100 : 0,
-                }),
-              );
-              setValidateFor(release.version);
-            });
-          },
-        },
+        { text: 'Flash', onPress: () => runFirmwareFlash(release) },
       ],
     );
   };
@@ -170,12 +193,46 @@ export function UpdateScreen({ route }: Props) {
     }
   };
 
-  const recheckAfterValidate = () =>
+  const recheckAfterValidate = () => {
+    if (!watch || !deviceId) {
+      return;
+    }
     void runStep(async () => {
-      await readRevision();
-      const now = await readFirmwareRevision(makeTransport(deviceId!), deviceId!);
+      const { revision: now, status: familyStatus } =
+        await readFirmwareFamilyState(makeTransport(deviceId), deviceId);
       setFirmwareRev(now);
-      if (validateFor && now === validateFor) {
+      if (isFamilyCutoverVersion(now) && watch.familyCutoverClearedAt === undefined) {
+        if (
+          familyStatus.storageWarning ||
+          familyStatus.state !== 'succeeded' ||
+          familyStatus.error !== 'none'
+        ) {
+          showAlert(
+            'Watch storage is not ready',
+            `InfiniTime ${now} is running, but its family-state storage reports ${familyStatus.state}/${familyStatus.error}. Keep the old phone data and inspect Sys Info before starting fresh.`,
+          );
+          return;
+        }
+        showAlert(
+          'Start fresh on 3.0?',
+          'The new firmware and storage protocol are confirmed. Continuing clears this phone’s old schedule, tasks, streak, prayer settings and Find My identity. Re-enter them from your screenshots.',
+          [
+            { text: 'Not yet', style: 'cancel' },
+            {
+              text: 'Clear old data',
+              style: 'destructive',
+              onPress: () => {
+                void (async () => {
+                  await deleteBeaconPrivateKey(watch.id);
+                  upsertWatch(clearWatchForFamilyCutover(watch, familyStatus));
+                  setValidateFor(null);
+                  showAlert('Ready for setup', `${watch.name} is running ${now}. Re-enter and sync each feature when convenient.`);
+                })();
+              },
+            },
+          ],
+        );
+      } else if (validateFor && now === validateFor) {
         setValidateFor(null);
         showAlert('Update confirmed', `The watch is now running ${now}.`);
       } else {
@@ -185,6 +242,7 @@ export function UpdateScreen({ route }: Props) {
         );
       }
     });
+  };
 
   if (!watch) return null;
 
@@ -242,6 +300,15 @@ export function UpdateScreen({ route }: Props) {
               this, the next reboot rolls back to the old version.
             </Text>
             <Button label="I validated — re-check" onPress={recheckAfterValidate} disabled={busy} testID="recheck" style={{ marginTop: spacing(1.5) }} />
+          </View>
+        )}
+        {!validateFor && paired && watch.familyCutoverClearedAt === undefined && (
+          <View style={[styles.card, styles.validateCard]} testID="family-protocol-check">
+            <Text style={styles.validateTitle}>Confirm InfiniTime 3.0</Text>
+            <Text style={styles.validateBody}>
+              If this watch already runs InfiniTime 3.0, check its storage protocol here to finish the one-time cutover.
+            </Text>
+            <Button label="Check 3.0 status" onPress={recheckAfterValidate} disabled={busy} testID="recheck" style={{ marginTop: spacing(1.5) }} />
           </View>
         )}
 
@@ -353,6 +420,50 @@ export function UpdateScreen({ route }: Props) {
           </View>
         </View>
       </Modal>
+
+      <Dialog
+        visible={cutoverRelease !== null}
+        onDismiss={() => {
+          setCutoverRelease(null);
+          setCutoverAcknowledged(false);
+        }}>
+        <DialogTitle>InfiniTime 3.0 starts fresh</DialogTitle>
+        <DialogSubtitle>
+          This breaking update clears the watch&rsquo;s schedule, tasks, task streak, alarms, prayer settings, Find My
+          identity and watch settings. Before flashing, capture screenshots of anything you want to enter again.
+        </DialogSubtitle>
+        <Pressable
+          style={styles.cutoverAck}
+          onPress={() => setCutoverAcknowledged((value) => !value)}
+          testID="cutover-acknowledge">
+          <Switch value={cutoverAcknowledged} onValueChange={setCutoverAcknowledged} />
+          <Text style={styles.cutoverAckText}>I captured the schedule, tasks, prayer settings and alarms I need.</Text>
+        </Pressable>
+        <DialogActions>
+          <DialogButton
+            label="Cancel"
+            onPress={() => {
+              setCutoverRelease(null);
+              setCutoverAcknowledged(false);
+            }}
+          />
+          <DialogButton
+            label="Flash 3.0"
+            primary
+            disabled={!cutoverAcknowledged}
+            testID="confirm-cutover-flash"
+            onPress={() => {
+              if (!cutoverAcknowledged || cutoverRelease === null) {
+                return;
+              }
+              const release = cutoverRelease;
+              setCutoverRelease(null);
+              setCutoverAcknowledged(false);
+              runFirmwareFlash(release);
+            }}
+          />
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
@@ -381,6 +492,8 @@ const styles = StyleSheet.create({
   validateTitle: { color: colors.warn, fontSize: 16, fontWeight: '700', marginBottom: spacing(1) },
   validateBody: { color: colors.text, fontSize: 14, lineHeight: 20 },
   bold: { fontWeight: '700' },
+  cutoverAck: { flexDirection: 'row', alignItems: 'center', gap: spacing(1.5), marginTop: spacing(2) },
+  cutoverAckText: { flex: 1, color: colors.text, fontSize: 14, lineHeight: 20 },
 
   note: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginBottom: spacing(1.5) },
 

@@ -43,13 +43,13 @@ test('sync command frames', () => {
   assert.deepEqual([...encodeCommitSync(3)], [0x02, 0x00, 3]);
   const msg = encodeTaskMessage(5, task());
   assert.equal(msg.length, 3 + TASK_RECORD_SIZE);
-  assert.deepEqual([...msg.subarray(0, 3)], [0x01, 0x01, 5]);
-  assert.deepEqual([...encodeSetStreak(300)], [0x04, 0x00, 0x2c, 0x01]); // 300 = 0x012c LE
+  assert.deepEqual([...msg.subarray(0, 3)], [0x01, 0x02, 5]);
+  assert.deepEqual([...encodeSetStreak(300, 0x01020304)], [0x04, 0x00, 0x2c, 0x01, 4, 3, 2, 1]);
 });
 
 test('digest decodes protoVer/capacity/count/version/streak (9 bytes)', () => {
-  const d = decodeTaskDigest(new Uint8Array([1, 20, 5, 0x04, 0x03, 0x02, 0x01, 0x0c, 0x01]));
-  assert.deepEqual(d, { protocolVersion: 1, capacity: 20, count: 5, version: 0x01020304, streak: 0x010c });
+  const d = decodeTaskDigest(new Uint8Array([2, 20, 5, 0x04, 0x03, 0x02, 0x01, 0x0c, 0x01]));
+  assert.deepEqual(d, { protocolVersion: 2, capacity: 20, count: 5, version: 0x01020304, streak: 0x010c });
   assert.equal(TASK_DIGEST_SIZE, 9);
   assert.throws(() => decodeTaskDigest(new Uint8Array(8)), /9 bytes/);
 });

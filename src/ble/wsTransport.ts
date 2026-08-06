@@ -120,10 +120,18 @@ export class WsTransport implements WatchTransport {
   }
 
   async disconnect(): Promise<void> {
-    if (this.socket) {
-      this.socket.onclose = null;
-      this.socket.close();
-      this.socket = undefined;
+    const socket = this.socket;
+    this.socket = undefined;
+    if (socket && socket.readyState !== WebSocket.CLOSED) {
+      await new Promise<void>((resolve) => {
+        const finish = () => resolve();
+        socket.onclose = finish;
+        socket.close();
+        setTimeout(finish, 250);
+      });
+      // Let the proxy close its TCP half so InfiniSim releases the exclusive
+      // virtual link before the next coordinated session opens.
+      await new Promise((resolve) => setTimeout(resolve, 25));
     }
     this.parser.reset();
     this.subscribers.clear();

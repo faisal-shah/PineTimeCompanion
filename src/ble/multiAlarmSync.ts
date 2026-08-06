@@ -23,6 +23,7 @@ import {
   decodeMultiAlarm,
   encodeMultiAlarm,
 } from './multiAlarmProtocol';
+import { waitForFamilyStateCommit } from './familyStateProtocol';
 
 const MAX_CAS_RETRIES = 5;
 const MTU = 64; // the alarm blob is 24 B; this is ample
@@ -56,12 +57,15 @@ export function updateAlarms(
       }
       try {
         await transport.write(BRIDGE_CHAR.multiAlarm, encodeMultiAlarm(current.version, next));
-        return await readOverOpen(transport); // confirm the committed state
       } catch (e) {
         // The watch rejects (nonzero GATT status → transport throws) on a CAS
         // mismatch; re-pull and retry. A persistent failure surfaces below.
         lastError = e as Error;
+        continue;
       }
+      const token = current.version === 0xffffffff ? 1 : (current.version + 1) >>> 0;
+      await waitForFamilyStateCommit(transport, 'multi_alarm', token);
+      return await readOverOpen(transport);
     }
     throw new Error(`alarm sync kept conflicting after ${MAX_CAS_RETRIES} retries: ${lastError?.message ?? 'unknown'}`);
   }, MTU);

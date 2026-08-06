@@ -10,9 +10,7 @@ import {
 } from './companionPairing';
 import { TransportError } from './transportError';
 
-// A transport whose per-characteristic read behaviour is scripted. `with
-// Connection` also negotiates an MTU and writes the clock on connect; both are
-// accepted and ignored here.
+// A transport whose per-characteristic read behaviour is scripted.
 class ScriptTransport {
   connects = 0;
   disconnects = 0;
@@ -65,7 +63,25 @@ test('verifies without a prompt when the watch has room', async () => {
   // also strengthens the consistency check that follows.
   assert.equal(t.connects, 1);
   assert.equal(t.disconnects, 1);
-  assert.deepEqual(t.reads, [BRIDGE_CHAR.companionStatus, BRIDGE_CHAR.companionVerify]);
+  assert.deepEqual(t.reads, [
+    BRIDGE_CHAR.companionStatus,
+    BRIDGE_CHAR.companionVerify,
+    BRIDGE_CHAR.familyStateStatus,
+  ]);
+});
+
+test('verified 3.0 pairing records the family-state protocol', async () => {
+  const family = () => Uint8Array.of(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0);
+  const t = new ScriptTransport({
+    [BRIDGE_CHAR.companionStatus]: room,
+    [BRIDGE_CHAR.companionVerify]: room,
+    [BRIDGE_CHAR.familyStateStatus]: family,
+  });
+  const out = await runVerifiedPairing(t as never, 'dev', noHooks);
+  assert.equal(out.kind, 'verified');
+  if (out.kind === 'verified') {
+    assert.equal(out.familyStatus?.activeGeneration, 7);
+  }
 });
 
 test('at capacity, confirming proceeds to verify and saves', async () => {

@@ -18,7 +18,7 @@ test('encode: Chicago-ish, ISNA, Hanafi, alerts on', () => {
     utcOffsetQuarters: -20,
   });
   assert.equal(b.length, PRAYER_SETTINGS_SIZE);
-  assert.equal(hex(b), '010101015c10c5ddec');
+  assert.equal(hex(b), '020101015c10c5ddec');
 });
 
 test('encode: Mecca, Umm al-Qura, Standard, alerts off', () => {
@@ -31,7 +31,7 @@ test('encode: Mecca, Umm al-Qura, Standard, alerts off', () => {
     lonE2: 3983,
     utcOffsetQuarters: 12,
   });
-  assert.equal(hex(b), '010300005e088f0f0c');
+  assert.equal(hex(b), '020300005e088f0f0c');
 });
 
 test('extreme offsets survive the round trip', () => {
@@ -56,7 +56,7 @@ test('round trip preserves negative coordinates exactly', () => {
 test('decode rejects wrong length and version', () => {
   assert.throws(() => decodePrayerSettings(new Uint8Array(8)));
   const bad = encodePrayerSettings({ method: 'mwl', asrMadhab: 'standard', alerts: 'off', latE2: 0, lonE2: 0, utcOffsetQuarters: 0 });
-  bad[0] = 2;
+  bad[0] = 1;
   assert.throws(() => decodePrayerSettings(bad));
 });
 
@@ -77,7 +77,7 @@ test('encode: all-but-Fajr sets both flag bits', () => {
     utcOffsetQuarters: -20,
   });
   // Same as the alerts-on vector but flags 0x03 instead of 0x01.
-  assert.equal(hex(b), '010101035c10c5ddec');
+  assert.equal(hex(b), '020101035c10c5ddec');
 });
 
 test('the three alert modes round trip', () => {

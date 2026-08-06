@@ -86,6 +86,11 @@ export const CHAR_MAP: Record<BridgeCharId, { service: string; characteristic: s
     characteristic: spec.companionVerify.characteristic,
     withResponse: true,
   },
+  [BRIDGE_CHAR.familyStateStatus]: {
+    service: spec.familyStateStatus.service,
+    characteristic: spec.familyStateStatus.characteristic,
+    withResponse: true,
+  },
 };
 
 // The DFU service is on the Web Bluetooth GATT blocklist; requesting it in

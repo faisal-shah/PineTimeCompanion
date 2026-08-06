@@ -35,11 +35,22 @@ export function DialogActions({ children }: { children: React.ReactNode }) {
   return <View style={styles.actions}>{children}</View>;
 }
 
-export function DialogButton(props: { label: string; onPress: () => void; primary?: boolean; testID?: string }) {
+export function DialogButton(props: {
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+  disabled?: boolean;
+  testID?: string;
+}) {
   return (
     <Pressable
-      style={[styles.button, props.primary === true && { backgroundColor: colors.accent }]}
+      style={[
+        styles.button,
+        props.primary === true && { backgroundColor: colors.accent },
+        props.disabled === true && styles.buttonDisabled,
+      ]}
       onPress={props.onPress}
+      disabled={props.disabled}
       testID={props.testID}>
       <Text style={[styles.buttonText, props.primary === true && { color: '#fff' }]}>{props.label}</Text>
     </Pressable>
@@ -97,5 +108,6 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing(1), marginTop: spacing(2) },
   button: { paddingHorizontal: spacing(3), paddingVertical: spacing(1.5), borderRadius: 10 },
+  buttonDisabled: { opacity: 0.4 },
   buttonText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });
