@@ -188,7 +188,7 @@ Two separate actions on WatchDetail:
   repair still fails does it point at the watch's own *Settings > Bluetooth >
   Forget all*, warning that this affects every paired phone.
 
-InfiniTime 2.0.1 intentionally starts with an empty final-format bond store
+InfiniTime 2.0.2 intentionally starts with an empty final-format bond store
 instead of importing either older format, including v1.26.0. Every phone and
 computer pairs once after that upgrade; schedules, tasks, alarms, settings, and
 resources remain intact.

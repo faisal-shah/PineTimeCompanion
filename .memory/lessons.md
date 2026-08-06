@@ -7,7 +7,7 @@
 - The forwarding service owns a persistent link independently of JavaScript.
 - Simulator IDs contain one colon; real BLE MACs contain five.
 - Public management status must be read before the authenticated verify step.
-- The 2.0.1 firmware reset is intentional format initialization, not a
+- The 2.0.2 firmware reset is intentional format initialization, not a
   compatibility migration.
 - An async DFU keeps running after a screen unmount unless navigation removal is
   explicitly prevented.

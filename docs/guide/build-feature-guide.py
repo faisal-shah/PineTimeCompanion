@@ -164,7 +164,7 @@ parts.append(f"""
   <h2>Firmware &amp; resources over the air</h2>
   {feature_card(t, s, wi, wc, pi, pc, bullets)}
   <div class="note">
-    <b>How an update runs.</b> Pick a release &rarr; the app downloads it &rarr; streams the firmware to the watch in the mandatory 20-byte DFU packets &rarr; the watch reboots into the new image <b>unvalidated</b>. You then tap <b>Settings &rarr; Firmware &rarr; Validate</b> on the watch to keep it &mdash; skip that and the next reboot rolls back. Finally the app pushes the matching resources over the BLE filesystem.
+    <b>How an update runs.</b> Pick a release &rarr; the app downloads it &rarr; streams the firmware to the watch in the mandatory 20-byte DFU packets &rarr; the watch reboots into the new image <b>unvalidated</b>. Back and swipe navigation stay locked until the transfer ends, and duplicate starts are rejected; keep the app in the foreground. You then tap <b>Settings &rarr; Firmware &rarr; Validate</b> on the watch to keep it &mdash; skip that and the next reboot rolls back. Finally the app pushes the matching resources over the BLE filesystem.
   </div>
   <div class="note" style="border-color:#c99a2b;background:#fdf7e9;">
     <b>Where it works.</b> Firmware DFU runs on <b>Android</b> and against the simulator; a plain web browser can&rsquo;t reach the DFU service (it&rsquo;s on Chromium&rsquo;s Bluetooth blocklist), so the app hides firmware there. Resource uploads work everywhere. Both require <b>&ldquo;Firmware &amp; files&rdquo;</b> enabled on the watch.
@@ -173,7 +173,7 @@ parts.append(f"""
 
 # NOTIFICATION FORWARDING + MUSIC (the live phone bridge)
 parts.append(f"""
-<section class="page">
+<section class="page dense">
   <div class="section-tag">Notifications &amp; alerts</div>
   <h2>Your phone on your wrist</h2>
   <p class="lead">On Android the app keeps a background connection to the watch and mirrors your phone &mdash; notifications, incoming calls, and now-playing music &mdash; all under one per-watch switch.</p>
@@ -245,7 +245,7 @@ parts.append(f"""
 
 # COMPANION ESSENTIALS
 parts.append(f"""
-<section class="page">
+<section class="page companion-page">
   <div class="section-tag">Companion app</div>
   <h2>Managing watches from the app</h2>
   <p class="lead">The app runs on Android, and on web/desktop for everything except firmware DFU. Add a watch, pair it, and each watch gets its own hub of features.</p>
@@ -256,6 +256,9 @@ parts.append(f"""
   </div>
   <div class="note">
     <b>From the hub</b> you reach every feature &mdash; Schedule, Alarms, Prayer times, Find My, Weather, Steps, Notifications, and Update &mdash; plus the quick actions: <b>Set time</b>, read <b>Battery</b>, and send a <b>Message</b> to the watch. Pairing works against a real watch over Bluetooth or against the InfiniTime simulator during development.
+  </div>
+  <div class="note">
+    <b>Verified pairing, and honest repair.</b> A watch remembers up to <b>five companion phones</b>; pairing a sixth evicts the least-recently-used one after confirmation. The app saves a watch only after encrypted verification. <b>Remove from app</b> leaves the system and watch bonds intact, while <b>Repair pairing</b> distinguishes a reset, LRU eviction, and an out-of-sync bond before guiding a system-Bluetooth re-pair. InfiniTime 2.0.2 imports no earlier bond format, so each companion pairs once after upgrading while watch data remains intact. Notification forwarding owns the watch&rsquo;s single link; the app reports that busy state instead of recommending needless re-pairing.
   </div>
 </section>
 """)
@@ -331,6 +334,17 @@ ul.bul li{margin-bottom:7px;font-size:12pt;line-height:1.42;}
 /* three phones */
 .devs3{display:flex;justify-content:center;gap:26px;margin-top:6px;}
 .devs3 .pbezel img{width:150px;}
+
+/* dense single-page sections */
+.dense .lead{font-size:12.5pt;margin-bottom:10px;}
+.dense .row.gap{gap:18px;}
+.dense .pbezel img{width:130px;}
+.dense .wbezel img{width:130px;height:130px;}
+.dense .note{font-size:10.7pt;line-height:1.32;padding:8px 12px;margin-top:9px;}
+.companion-page .lead{font-size:12.5pt;margin-bottom:10px;}
+.companion-page .devs3{gap:18px;}
+.companion-page .devs3 .pbezel img{width:136px;}
+.companion-page .note{font-size:10.7pt;line-height:1.34;padding:9px 12px;margin-top:10px;}
 
 /* plain / wide figure */
 .plainfig img{max-width:100%;border-radius:8px;border:1px solid var(--line);}

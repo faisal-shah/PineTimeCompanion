@@ -8,7 +8,7 @@
 - Next task: P3-T1
 - Next action: run Android/web/desktop fleet handoff steps from
   `../pinetime-dev-tools/RELEASE.md` and save the hardware JSON evidence.
-- Last checkpoint: 2026-08-04 23:44 UTC
+- Last checkpoint: 2026-08-06 02:18 UTC
 
 ## Phase 1 - Connection ownership
 
@@ -23,7 +23,8 @@
 - [x] P2-T2 add capacity confirmation and repair guidance (2026-08-04)
 - [x] P2-T3 add native public bond/settings helpers (2026-08-04)
 - [x] P2-T4 update docs and rendered feature-guide PDF (2026-08-04)
-- [x] GATE-P2 - 247 TS and 21 Kotlin tests pass; commit `fc7c187` created
+- [x] GATE-P2 - 250 TS and 21 Kotlin tests pass; 12-page feature guide rendered
+  and inspected (2026-08-05)
 
 ## Phase 3 - Physical ship gate
 

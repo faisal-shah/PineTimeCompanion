@@ -32,7 +32,7 @@ Kotlin/Android public Bluetooth APIs, and Node test runner.
 - Remove from app does not claim to remove the OS or watch bond.
 - Repair uses system settings; no hidden `removeBond` reflection.
 - Older firmware requires an explicit unverified legacy confirmation.
-- InfiniTime 2.0.1 imports no previous bond format; all companions pair once
+- InfiniTime 2.0.2 imports no previous bond format; all companions pair once
   after the major-version cutover.
 - UpdateScreen removal is blocked during transfer; duplicate starts are guarded
   synchronously rather than relying only on rendered React state.
