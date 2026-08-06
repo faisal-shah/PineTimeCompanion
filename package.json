@@ -66,7 +66,9 @@
     "desktop:export": "expo export --platform web --output-dir desktop/dist",
     "desktop:e2e": "node scripts/desktop-e2e.mjs",
     "notify:e2e": "node scripts/notify-e2e.mjs",
-    "music:e2e": "node scripts/music-e2e.mjs"
+    "music:e2e": "node scripts/music-e2e.mjs",
+    "action:layout": "node scripts/action-label-check.mjs",
+    "assets:check": "tsx scripts/release-asset-check.ts"
   },
   "private": true
 }

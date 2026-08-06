@@ -8,7 +8,7 @@
 - Next task: P3-T1
 - Next action: run Android/web/desktop fleet handoff steps from
   `../pinetime-dev-tools/RELEASE.md` and save the hardware JSON evidence.
-- Last checkpoint: 2026-08-06 02:18 UTC
+- Last checkpoint: 2026-08-06 05:40 UTC
 
 ## Phase 1 - Connection ownership
 
@@ -29,6 +29,8 @@
 ## Phase 3 - Physical ship gate
 
 - [x] P3-T0 prevent Update screen removal and duplicate DFU starts (2026-08-05)
+- [x] P3-T0b fix the Android download BufferOverflowException and centre the
+  wrapped Repair pairing label (2026-08-06)
 - [ ] P3-T1 validate sequential access on independent Android phones
 - [ ] P3-T2 validate forwarding ownership and out-of-range recovery
 - [ ] P3-T3 validate system repair instructions on deployed OS versions

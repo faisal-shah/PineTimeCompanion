@@ -11,6 +11,15 @@
   compatibility migration.
 - An async DFU keeps running after a screen unmount unless navigation removal is
   explicitly prevented.
+- Expo SDK 57's native fetch races in `ResponseSink.finalize` (expo/expo#47762);
+  merely reading `response.body` starts that state machine, so native downloads
+  must use `arrayBuffer()` and never reference the property.
+- `alignItems: 'center'` centres a Text *box*, not its text. A label that wraps
+  fills its container and then renders left-aligned unless `textAlign` says
+  otherwise.
+- `Range.getClientRects()` emits a rect for the collapsed space at a line break,
+  which reads as a wildly off-centre extra line. Measure per-character rects and
+  group them by line to get the true inked extent.
 
 ## Patterns
 
@@ -32,3 +41,4 @@
 |---|---:|---|
 | 2026-08-04 | 8 | Pairing, repair, ownership, tests, docs, and commit complete |
 | 2026-08-05 | 1 | Active updates now block screen removal and duplicate starts |
+| 2026-08-06 | 1 | Native downloads bypass the Expo fetch race; action labels centre when wrapped |

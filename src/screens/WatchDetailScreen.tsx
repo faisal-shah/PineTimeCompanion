@@ -412,7 +412,10 @@ const styles = StyleSheet.create({
   },
   actionIcon: { fontSize: 22 },
   actionSpinner: { height: 26, justifyContent: 'center' },
-  actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  // stretch + textAlign so a label that wraps ("Repair pairing" at narrow
+  // widths) stays centred. alignItems on the button only centres the Text box;
+  // once the box fills the width, the text inside falls back to left.
+  actionLabel: { color: colors.text, fontSize: 13, fontWeight: '600', alignSelf: 'stretch', textAlign: 'center', paddingHorizontal: 2 },
 
   pending: { color: colors.warn, fontSize: 12, marginRight: spacing(1) },
   deleteWrap: { marginTop: spacing(4) },

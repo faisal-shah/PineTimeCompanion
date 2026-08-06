@@ -54,19 +54,54 @@ export async function fetchReleases(repo: string): Promise<Release[]> {
   return raw.map(mapRelease).filter((r) => r.dfuUrl || r.resourcesUrl);
 }
 
+/**
+ * Whether this runtime may read `Response.body`.
+ *
+ * Expo SDK 57's native fetch finalizes its response sink without synchronizing
+ * the chunk queue (expo/expo#47762). `ResponseSink.finalize` sizes a ByteBuffer
+ * from the queue and then fills it from that same queue; a chunk arriving from
+ * the OkHttp IO thread in between overflows the buffer and throws
+ * `java.nio.BufferOverflowException` mid-download. It is a race, so it fails
+ * intermittently and succeeds on retry.
+ *
+ * Only the browser's implementation is safe. Native therefore takes the
+ * completed one-shot `arrayBuffer()` path and must never touch `body` at all —
+ * merely reading the property starts the streaming state machine.
+ *
+ * Web builds render into a DOM and React Native does not, so `document` is the
+ * discriminator. Using it keeps this module free of a `react-native` import,
+ * which is what lets it run under `tsx --test`.
+ */
+export function canStreamResponseBody(): boolean {
+  return typeof document !== 'undefined';
+}
+
 /** Download an asset to bytes, reporting progress when the stream/length allow. */
-export async function downloadAsset(url: string, onProgress?: (received: number, total: number) => void): Promise<Uint8Array> {
+export async function downloadAsset(
+  url: string,
+  onProgress?: (received: number, total: number) => void,
+  allowStreaming: boolean = canStreamResponseBody(),
+): Promise<Uint8Array> {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Download failed (${res.status})`);
   }
   const total = Number(res.headers.get('content-length')) || 0;
 
-  // Stream for progress where supported (browsers); RN often lacks a readable
-  // body, so fall back to a single buffered read.
-  const reader = onProgress && res.body ? res.body.getReader() : undefined;
+  // Native: read the completed body in one shot without referencing res.body,
+  // then report a single completion tick so the bar does not sit at zero.
+  if (!allowStreaming || !onProgress) {
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    onProgress?.(bytes.length, total || bytes.length);
+    return bytes;
+  }
+
+  // Web: a real WHATWG stream, so report incremental progress.
+  const reader = res.body?.getReader();
   if (!reader) {
-    return new Uint8Array(await res.arrayBuffer());
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    onProgress(bytes.length, total || bytes.length);
+    return bytes;
   }
   const chunks: Uint8Array[] = [];
   let received = 0;
