@@ -45,7 +45,7 @@ test('cutover blocks a local schedule above generated capacity', () => {
     enabled: true,
     lastModified: 1,
   }));
-  assert.match(familyCutoverBlockReason(value) ?? '', /at most 32/);
+  assert.match(familyCutoverBlockReason(value) ?? '', new RegExp(`at most ${RECORDS.schedule.capacity}`));
   value.schedule.items.pop();
   assert.equal(familyCutoverBlockReason(value), null);
 });
@@ -55,8 +55,8 @@ test('confirmed cutover clears incompatible local state without losing pairing',
   value.deviceId = 'AA:BB';
   const cleared = clearWatchForFamilyCutover(value, status, new Date('2026-08-06T12:00:00.000Z'));
   assert.equal(cleared.deviceId, 'AA:BB');
-  assert.deepEqual(cleared.schedule, { items: [], version: 1, capacity: 32 });
-  assert.deepEqual(cleared.tasks, { items: [], version: 1, capacity: 20 });
+  assert.deepEqual(cleared.schedule, { items: [], version: 1, capacity: RECORDS.schedule.capacity });
+  assert.deepEqual(cleared.tasks, { items: [], version: 1, capacity: RECORDS.task.capacity });
   assert.equal(cleared.taskStreak, undefined);
   assert.equal(cleared.prayerSettings, undefined);
   assert.equal(cleared.beacon, undefined);
